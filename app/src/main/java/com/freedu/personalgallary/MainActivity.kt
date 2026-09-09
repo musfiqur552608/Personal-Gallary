@@ -41,7 +41,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -151,6 +153,7 @@ private fun AppRoot(
 ) {
     val context = LocalContext.current
     val activity = context as FragmentActivity
+    val haptics = LocalHapticFeedback.current
     val galleryVm: GalleryViewModel = viewModel()
     val state by galleryVm.state.collectAsState()
     val settings by settingsVm.state.collectAsState()
@@ -401,6 +404,7 @@ private fun AppRoot(
                             selected = currentRoute == tab.route,
                             onClick = {
                                 onUserActive()
+                                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                                 nav.navigate(tab.route) {
                                     popUpTo(nav.graph.findStartDestination().id) { saveState = true }
                                     launchSingleTop = true
@@ -424,6 +428,7 @@ private fun AppRoot(
                         posts = if (query.isBlank()) posts else galleryVm.search(query, posts),
                         memories = memories,
                         stories = stories,
+                        totalCount = allItems.size,
                         isFavorite = { galleryVm.isFavorite(it) },
                         captionFor = { galleryVm.captionFor(it) },
                         onOpen = ::openDetail,
@@ -435,7 +440,8 @@ private fun AppRoot(
                             captionText = galleryVm.captionFor(it.id).orEmpty()
                         },
                         onAddToAlbum = { albumTarget = it },
-                        onOpenMemories = { showMemories = true }
+                        onOpenMemories = { showMemories = true },
+                        onRefresh = { galleryVm.refresh() }
                     )
                 }
                 composable(Routes.REELS) {
@@ -474,7 +480,9 @@ private fun AppRoot(
                         onSelectAlbum = { deviceAlbumFilter = it },
                         isFavorite = { galleryVm.isFavorite(it) },
                         onOpen = ::openDetail,
-                        onOpenAlbumDetail = { name -> nav.navigate(Routes.albumDetail(name)) }
+                        onOpenAlbumDetail = { name -> nav.navigate(Routes.albumDetail(name)) },
+                        photoCount = insights.photoCount,
+                        videoCount = insights.videoCount
                     )
                 }
                 composable(Routes.FAVORITES) {

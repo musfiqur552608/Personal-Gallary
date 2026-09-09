@@ -54,6 +54,8 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import coil.compose.AsyncImage
 import com.freedu.personalgallary.data.model.MediaItem
+import com.freedu.personalgallary.ui.components.DoubleTapLikeBox
+import com.freedu.personalgallary.ui.components.PopLikeButton
 import com.freedu.personalgallary.util.FormatUtils
 import net.engawapg.lib.zoomable.rememberZoomState
 import net.engawapg.lib.zoomable.zoomable
@@ -98,13 +100,10 @@ fun DetailScreen(
                 title = "${pager.currentPage + 1} / ${items.size}",
                 onBack = onBack,
                 actions = {
-                    IconButton({ onToggleFavorite(current) }) {
-                        Icon(
-                            if (isFavorite(current.id)) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                            "Favorite",
-                            tint = if (isFavorite(current.id)) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
-                        )
-                    }
+                    PopLikeButton(
+                        liked = isFavorite(current.id),
+                        onToggle = { onToggleFavorite(current) }
+                    )
                     IconButton({ onShare(current) }) { Icon(Icons.Default.Share, "Share") }
                     IconButton({ showDeleteDialog = true }) { Icon(Icons.Default.Delete, "Delete") }
                 }
@@ -119,12 +118,18 @@ fun DetailScreen(
                         VideoPlayerView(item, active = page == pager.currentPage)
                     } else {
                         val zoom = rememberZoomState()
-                        AsyncImage(
-                            model = item.uri,
-                            contentDescription = item.name,
-                            contentScale = ContentScale.Fit,
-                            modifier = Modifier.fillMaxSize().zoomable(zoom)
-                        )
+                        DoubleTapLikeBox(
+                            onTap = {},
+                            onDoubleTap = { onToggleFavorite(items[pager.currentPage]) },
+                            modifier = Modifier.fillMaxSize()
+                        ) {
+                            AsyncImage(
+                                model = item.uri,
+                                contentDescription = item.name,
+                                contentScale = ContentScale.Fit,
+                                modifier = Modifier.fillMaxSize().zoomable(zoom)
+                            )
+                        }
                     }
                 }
             }

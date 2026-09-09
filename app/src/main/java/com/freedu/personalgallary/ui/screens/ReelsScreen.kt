@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -20,6 +21,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.pager.VerticalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Favorite
@@ -41,6 +43,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -49,8 +52,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.media3.common.MediaItem as ExoMediaItem
@@ -62,7 +67,10 @@ import androidx.media3.ui.PlayerView
 import com.freedu.personalgallary.data.model.MediaItem
 import com.freedu.personalgallary.ui.components.EmptyState
 import com.freedu.personalgallary.ui.components.GradientScrim
+import com.freedu.personalgallary.ui.components.PopLikeButton
+import com.freedu.personalgallary.ui.theme.brandHorizontal
 import com.freedu.personalgallary.util.FormatUtils
+import kotlinx.coroutines.delay
 
 /**
  * Full-screen vertical swipe feed for short videos (<= 60s). Auto-play, loop, preload-next.
@@ -117,9 +125,11 @@ private fun ReelPage(
     onWallpaper: (() -> Unit)?
 ) {
     val context = LocalContext.current
+    val haptics = LocalHapticFeedback.current
     var muted by remember { mutableStateOf(false) }
     var paused by remember { mutableStateOf(false) }
     var menu by remember { mutableStateOf(false) }
+    var progress by remember { mutableFloatStateOf(0f) }
     val heartScale = remember { Animatable(0f) }
 
     val player = remember(item.uri) {
@@ -137,6 +147,14 @@ private fun ReelPage(
         if (active && !paused) player.play() else player.pause()
     }
     LaunchedEffect(muted) { player.volume = if (muted) 0f else 1f }
+    // live playback progress for the progress bar
+    LaunchedEffect(active) {
+        while (active) {
+            val d = player.duration
+            progress = if (d > 0) (player.currentPosition.toFloat() / d).coerceIn(0f, 1f) else 0f
+            delay(150)
+        }
+    }
 
     Box(
         modifier = Modifier
@@ -146,6 +164,7 @@ private fun ReelPage(
                 detectTapGestures(
                     onTap = { paused = !paused },
                     onDoubleTap = {
+                        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                         if (!liked) onToggleFavorite()
                     }
                 )
@@ -195,14 +214,13 @@ private fun ReelPage(
             modifier = Modifier.align(Alignment.CenterEnd).padding(end = 8.dp, bottom = 96.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            IconButton(onClick = onToggleFavorite) {
-                Icon(
-                    if (liked) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                    "Favorite",
-                    tint = if (liked) Color(0xFFFF4D6D) else Color.White,
-                    modifier = Modifier.size(32.dp)
-                )
-            }
+            PopLikeButton(
+                liked = liked,
+                onToggle = onToggleFavorite,
+                size = 32.dp,
+                activeColor = Color(0xFFFF4D6D),
+                inactiveColor = Color.White
+            )
             IconButton(onClick = { muted = !muted }) {
                 Icon(
                     if (muted) Icons.Default.VolumeOff else Icons.Default.VolumeUp,
@@ -231,8 +249,12 @@ private fun ReelPage(
                 GradientScrim(Modifier.fillMaxWidth().height(140.dp))
             }
             Column(
-                Modifier.align(Alignment.BottomStart)
-                    .padding(start = 16.dp, end = 80.dp, bottom = 100.dp)
+                Modifier
+                    .align(Alignment.BottomStart)
+                    .padding(start = 12.dp, end = 80.dp, bottom = 104.dp)
+                    .clip(RoundedCornerShape(18.dp))
+                    .background(Color.Black.copy(alpha = 0.55f))
+                    .padding(horizontal = 14.dp, vertical = 10.dp)
             ) {
                 Text(item.albumName.ifBlank { "Reels" }, color = Color.White, style = MaterialTheme.typography.titleSmall)
                 Spacer(Modifier.height(2.dp))
@@ -257,6 +279,21 @@ private fun ReelPage(
                 Icon(Icons.Default.Delete, "Delete", tint = Color.White.copy(alpha = 0.9f))
             }
             Spacer(Modifier.width(4.dp))
+        }
+        // playback progress
+        Box(
+            Modifier
+                .align(Alignment.BottomStart)
+                .fillMaxWidth()
+                .height(3.dp)
+                .background(Color.White.copy(alpha = 0.25f))
+        ) {
+            Box(
+                Modifier
+                    .fillMaxHeight()
+                    .fillMaxWidth(progress)
+                    .background(brandHorizontal)
+            )
         }
     }
 }
