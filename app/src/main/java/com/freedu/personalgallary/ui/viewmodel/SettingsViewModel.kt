@@ -22,7 +22,10 @@ data class SettingsUiState(
     val excludedAlbums: Set<String> = emptySet(),
     val onboarded: Boolean = false,
     val showReelsInfo: Boolean = true,
-    val hasPin: Boolean = false
+    val hasPin: Boolean = false,
+    val hasDecoy: Boolean = false,
+    val dailyReminder: Boolean = false,
+    val dynamicAccent: Boolean = false
 )
 
 class SettingsViewModel(app: Application) : AndroidViewModel(app) {
@@ -43,7 +46,10 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
             excludedAlbums = all.excludedAlbums,
             onboarded = all.onboarded,
             showReelsInfo = all.showReelsInfo,
-            hasPin = locks.hasPin()
+            hasPin = locks.hasPin(),
+            hasDecoy = locks.hasDecoy(),
+            dailyReminder = all.dailyReminder,
+            dynamicAccent = all.dynamicAccent
         )
     }.stateIn(viewModelScope, SharingStarted.Eagerly, SettingsUiState())
 
@@ -56,12 +62,26 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
     fun setExcluded(s: Set<String>) = viewModelScope.launch { repo.setExcludedAlbums(s) }
     fun setOnboarded() = viewModelScope.launch { repo.setOnboarded() }
     fun setShowReelsInfo(b: Boolean) = viewModelScope.launch { repo.setShowReelsInfo(b) }
+    fun setDailyReminder(b: Boolean) = viewModelScope.launch { repo.setDailyReminder(b) }
+    fun setDynamicAccent(b: Boolean) = viewModelScope.launch { repo.setDynamicAccent(b) }
 
     fun savePin(pin: String) {
         locks.setPin(pin)
         pinTick.value++
     }
     fun verifyPin(pin: String): Boolean = locks.verifyPin(pin)
+    fun verifyDecoy(pin: String): Boolean = locks.verifyDecoy(pin)
+    fun saveDecoy(pin: String) {
+        locks.setDecoyPin(pin)
+        pinTick.value++
+    }
+    fun clearDecoy() {
+        locks.clearDecoy()
+        pinTick.value++
+    }
+    fun refreshPinState() {
+        pinTick.value++
+    }
     fun clearPin() {
         locks.clearPin()
         pinTick.value++

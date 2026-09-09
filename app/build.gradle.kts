@@ -50,10 +50,11 @@ dependencies {
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.navigation.compose)
 
-    // Media playback (Reels)
+    // Media playback (Reels) + video trim/export
     implementation(libs.androidx.media3.exoplayer)
     implementation(libs.androidx.media3.ui)
     implementation(libs.androidx.media3.common)
+    implementation(libs.androidx.media3.transformer)
 
     // Image loading / thumbnail caching
     implementation(libs.coil.compose)
@@ -72,6 +73,8 @@ dependencies {
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.androidx.work.runtime.ktx)
     implementation(libs.zoomable)
+    implementation(libs.androidx.exifinterface)
+    implementation(libs.androidx.palette)
 
     testImplementation(libs.junit)
     androidTestImplementation(platform(libs.androidx.compose.bom))

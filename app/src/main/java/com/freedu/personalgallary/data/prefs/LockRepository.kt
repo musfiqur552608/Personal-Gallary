@@ -39,6 +39,22 @@ class LockRepository(context: Context) {
         prefs.edit().remove(KEY_PIN).apply()
     }
 
+    /** Decoy PIN opens a limited innocuous library (favorites/vault/trash hidden). */
+    fun hasDecoy(): Boolean = prefs.contains(KEY_DECOY)
+
+    fun setDecoyPin(pin: String) {
+        prefs.edit().putString(KEY_DECOY, sha256(pin)).apply()
+    }
+
+    fun verifyDecoy(pin: String): Boolean {
+        val stored = prefs.getString(KEY_DECOY, null) ?: return false
+        return stored == sha256(pin)
+    }
+
+    fun clearDecoy() {
+        prefs.edit().remove(KEY_DECOY).apply()
+    }
+
     private fun sha256(s: String): String {
         val d = MessageDigest.getInstance("SHA-256").digest(s.toByteArray())
         return d.joinToString("") { "%02x".format(it) }
@@ -46,5 +62,6 @@ class LockRepository(context: Context) {
 
     companion object {
         private const val KEY_PIN = "pin_hash"
+        private const val KEY_DECOY = "decoy_hash"
     }
 }

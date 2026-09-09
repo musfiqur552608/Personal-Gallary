@@ -25,6 +25,7 @@ import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.filled.ViewAgenda
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -69,7 +70,8 @@ fun GalleryScreen(
     onOpen: (MediaItem) -> Unit,
     onOpenAlbumDetail: (String) -> Unit,
     photoCount: Int = 0,
-    videoCount: Int = 0
+    videoCount: Int = 0,
+    onShuffle: () -> Unit = {}
 ) {
     val groupByMonth = query.isBlank() && selectedAlbum == null &&
         activeFilter == GalleryFilter.ALL && isGrid
@@ -120,6 +122,9 @@ fun GalleryScreen(
                         color = Color.White.copy(alpha = 0.85f),
                         style = MaterialTheme.typography.bodySmall
                     )
+                }
+                IconButton(onClick = onShuffle) {
+                    Icon(Icons.Default.Shuffle, "Shuffle", tint = Color.White)
                 }
                 IconButton(onClick = onToggleView) {
                     Icon(

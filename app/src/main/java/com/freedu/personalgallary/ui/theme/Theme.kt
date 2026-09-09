@@ -37,6 +37,7 @@ private val LightColorScheme = lightColorScheme(
 fun PersonalGallaryTheme(
     themeMode: ThemeMode = ThemeMode.SYSTEM,
     dynamicColor: Boolean = false,
+    accent: androidx.compose.ui.graphics.Color? = null,
     content: @Composable () -> Unit
 ) {
     val systemDark = isSystemInDarkTheme()
@@ -45,13 +46,29 @@ fun PersonalGallaryTheme(
         ThemeMode.DARK -> true
         ThemeMode.SYSTEM -> systemDark
     }
+    val primary = accent ?: BrandPink
+    val darkScheme = darkColorScheme(
+        primary = primary,
+        secondary = BrandViolet,
+        tertiary = BrandTeal,
+        background = DarkBackground,
+        surface = DarkSurface,
+        surfaceVariant = DarkSurfaceVariant
+    )
+    val lightScheme = lightColorScheme(
+        primary = primary,
+        secondary = BrandViolet,
+        tertiary = BrandTeal,
+        background = LightBackground,
+        surface = LightSurface
+    )
     val colorScheme = when {
         dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
             val context = LocalContext.current
             if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
         }
-        darkTheme -> DarkColorScheme
-        else -> LightColorScheme
+        darkTheme -> darkScheme
+        else -> lightScheme
     }
     val view = LocalView.current
     if (!view.isInEditMode) {

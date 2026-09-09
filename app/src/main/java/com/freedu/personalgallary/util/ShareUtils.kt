@@ -9,8 +9,24 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 object ShareUtils {
-    fun share(context: Context, items: List<MediaItem>) {
-        if (items.isEmpty()) return
+    fun shareText(context: Context, text: String, title: String = "Share") {
+        val intent = Intent(Intent.ACTION_SEND).apply {
+            type = "text/plain"
+            putExtra(Intent.EXTRA_TEXT, text)
+        }
+        context.startActivity(Intent.createChooser(intent, title))
+    }
+
+    fun shareFile(context: Context, uri: android.net.Uri, mime: String, title: String = "Share") {
+        val intent = Intent(Intent.ACTION_SEND).apply {
+            type = mime
+            putExtra(Intent.EXTRA_STREAM, uri)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        context.startActivity(Intent.createChooser(intent, title))
+    }
+
+    fun share(context: Context, items: List<MediaItem>) {        if (items.isEmpty()) return
         val uris = ArrayList(items.map { it.uri })
         val intent = if (uris.size == 1) {
             Intent(Intent.ACTION_SEND).apply {

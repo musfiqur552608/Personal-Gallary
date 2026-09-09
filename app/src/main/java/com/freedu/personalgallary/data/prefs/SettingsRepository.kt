@@ -26,6 +26,8 @@ class SettingsRepository(private val context: Context) {
         val EXCLUDED = stringSetPreferencesKey("excluded_albums")
         val ONBOARDED = booleanPreferencesKey("onboarded")
         val SHOW_INFO_ON_REELS = booleanPreferencesKey("reels_info")
+        val REMINDER = booleanPreferencesKey("daily_reminder")
+        val DYNAMIC_ACCENT = booleanPreferencesKey("dynamic_accent")
     }
 
     data class AllSettings(
@@ -37,7 +39,9 @@ class SettingsRepository(private val context: Context) {
         val blockScreenshots: Boolean = false,
         val excludedAlbums: Set<String> = emptySet(),
         val onboarded: Boolean = false,
-        val showReelsInfo: Boolean = true
+        val showReelsInfo: Boolean = true,
+        val dailyReminder: Boolean = false,
+        val dynamicAccent: Boolean = false
     )
 
     /** Single snapshot flow — avoids fragile many-flow combine overloads. */
@@ -55,7 +59,9 @@ class SettingsRepository(private val context: Context) {
             blockScreenshots = p[Keys.BLOCK_SCREENSHOT] == true,
             excludedAlbums = p[Keys.EXCLUDED] ?: emptySet(),
             onboarded = p[Keys.ONBOARDED] == true,
-            showReelsInfo = p[Keys.SHOW_INFO_ON_REELS] != false
+            showReelsInfo = p[Keys.SHOW_INFO_ON_REELS] != false,
+            dailyReminder = p[Keys.REMINDER] == true,
+            dynamicAccent = p[Keys.DYNAMIC_ACCENT] == true
         )
     }
 
@@ -68,6 +74,8 @@ class SettingsRepository(private val context: Context) {
     val excludedAlbums: Flow<Set<String>> = all.map { it.excludedAlbums }
     val onboarded: Flow<Boolean> = all.map { it.onboarded }
     val showReelsInfo: Flow<Boolean> = all.map { it.showReelsInfo }
+    val dailyReminder: Flow<Boolean> = all.map { it.dailyReminder }
+    val dynamicAccent: Flow<Boolean> = all.map { it.dynamicAccent }
 
     suspend fun setTheme(mode: ThemeMode) {
         context.settingsStore.edit { it[Keys.THEME] = mode.name }
@@ -95,5 +103,11 @@ class SettingsRepository(private val context: Context) {
     }
     suspend fun setShowReelsInfo(show: Boolean) {
         context.settingsStore.edit { it[Keys.SHOW_INFO_ON_REELS] = show }
+    }
+    suspend fun setDailyReminder(enabled: Boolean) {
+        context.settingsStore.edit { it[Keys.REMINDER] = enabled }
+    }
+    suspend fun setDynamicAccent(enabled: Boolean) {
+        context.settingsStore.edit { it[Keys.DYNAMIC_ACCENT] = enabled }
     }
 }

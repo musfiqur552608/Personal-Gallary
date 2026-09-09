@@ -24,6 +24,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Cake
+import androidx.compose.material.icons.filled.Casino
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PlayCircle
 import androidx.compose.material.icons.filled.Refresh
@@ -79,7 +80,8 @@ fun FeedScreen(
     onEditCaption: (MediaItem) -> Unit,
     onAddToAlbum: (MediaItem) -> Unit,
     onOpenMemories: () -> Unit = {},
-    onRefresh: () -> Unit = {}
+    onRefresh: () -> Unit = {},
+    onSurprise: () -> Unit = {}
 ) {
     if (isLoading) {
         Column(Modifier.fillMaxSize()) {
@@ -120,7 +122,7 @@ fun FeedScreen(
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         item {
-            FeedHeader(totalCount = totalCount, onRefresh = onRefresh)
+            FeedHeader(totalCount = totalCount, onRefresh = onRefresh, onSurprise = onSurprise)
         }
         if (stories.isNotEmpty()) {
             item {
@@ -150,7 +152,7 @@ fun FeedScreen(
 }
 
 @Composable
-private fun FeedHeader(totalCount: Int, onRefresh: () -> Unit) {
+private fun FeedHeader(totalCount: Int, onRefresh: () -> Unit, onSurprise: () -> Unit) {
     Row(
         Modifier
             .fillMaxWidth()
@@ -176,6 +178,9 @@ private fun FeedHeader(totalCount: Int, onRefresh: () -> Unit) {
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+        }
+        IconButton(onClick = onSurprise) {
+            Icon(Icons.Default.Casino, "Surprise me")
         }
         IconButton(onClick = onRefresh) {
             Icon(Icons.Default.Refresh, "Re-scan library")

@@ -71,7 +71,10 @@ fun ProfileScreen(
     onManageFolders: () -> Unit,
     onManageAlbums: () -> Unit,
     onExport: () -> Unit,
-    onRefresh: () -> Unit
+    onRefresh: () -> Unit,
+    dynamicAccent: Boolean = false,
+    onDynamicAccent: (Boolean) -> Unit = {},
+    onOpenTools: () -> Unit = {}
 ) {
     var showTheme by remember { mutableStateOf(false) }
     var showAutoLock by remember { mutableStateOf(false) }
@@ -153,6 +156,11 @@ fun ProfileScreen(
                 headlineContent = { Text("Show info overlay on Reels") },
                 trailingContent = { Switch(settings.showReelsInfo, onShowReelsInfo) }
             )
+            ListItem(
+                headlineContent = { Text("Photo-matched accent") },
+                supportingContent = { Text("Theme tint from your latest photo") },
+                trailingContent = { Switch(dynamicAccent, onDynamicAccent) }
+            )
         }
 
         Section("Privacy & lock") {
@@ -211,6 +219,12 @@ fun ProfileScreen(
                 headlineContent = { Text("Export / backup (local zip)") },
                 supportingContent = { Text("Favorites + settings metadata, stays on device") },
                 modifier = Modifier.clickable { onExport() }
+            )
+            ListItem(
+                headlineContent = { Text("Labs & tools") },
+                supportingContent = { Text("Slideshow, stats, collage, vault, trash & more") },
+                trailingContent = { Icon(Icons.Default.ChevronRight, null) },
+                modifier = Modifier.clickable { onOpenTools() }
             )
         }
         Spacer(Modifier.height(24.dp))

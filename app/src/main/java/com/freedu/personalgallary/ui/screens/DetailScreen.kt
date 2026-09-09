@@ -24,8 +24,11 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -76,6 +79,10 @@ fun DetailScreen(
     onSaveCaption: (MediaItem, String) -> Unit,
     onAddToAlbum: (MediaItem) -> Unit,
     onDetails: (MediaItem) -> Unit,
+    onEditPhoto: (MediaItem) -> Unit = {},
+    onMarkup: (MediaItem) -> Unit = {},
+    onTrimVideo: (MediaItem) -> Unit = {},
+    onLockItem: (MediaItem) -> Unit = {},
     onBack: () -> Unit
 ) {
     if (items.isEmpty()) {
@@ -92,6 +99,7 @@ fun DetailScreen(
     val pager = rememberPagerState(initialPage = safeStart, pageCount = { items.size })
     var showCaptionDialog by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
+    var overflow by remember { mutableStateOf(false) }
     val current = items[pager.currentPage]
 
     Scaffold(
@@ -106,6 +114,28 @@ fun DetailScreen(
                     )
                     IconButton({ onShare(current) }) { Icon(Icons.Default.Share, "Share") }
                     IconButton({ showDeleteDialog = true }) { Icon(Icons.Default.Delete, "Delete") }
+                    IconButton({ overflow = true }) { Icon(Icons.Default.MoreVert, "More actions") }
+                    DropdownMenu(expanded = overflow, onDismissRequest = { overflow = false }) {
+                        if (!current.isVideo) {
+                            DropdownMenuItem(
+                                text = { Text("Edit photo") },
+                                onClick = { overflow = false; onEditPhoto(current) }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Markup & annotate") },
+                                onClick = { overflow = false; onMarkup(current) }
+                            )
+                        } else {
+                            DropdownMenuItem(
+                                text = { Text("Trim & mute") },
+                                onClick = { overflow = false; onTrimVideo(current) }
+                            )
+                        }
+                        DropdownMenuItem(
+                            text = { Text("Move to vault") },
+                            onClick = { overflow = false; onLockItem(current) }
+                        )
+                    }
                 }
             )
         }
@@ -199,13 +229,13 @@ fun DetailScreen(
     if (showDeleteDialog) {
         AlertDialog(
             onDismissRequest = { showDeleteDialog = false },
-            title = { Text("Delete this file?") },
-            text = { Text("This removes it from device storage, not just the app.") },
+            title = { Text("Move to trash?") },
+            text = { Text("You can restore it within 30 days.") },
             confirmButton = {
                 TextButton({
                     showDeleteDialog = false
                     onDelete(current)
-                }) { Text("Delete", color = MaterialTheme.colorScheme.error) }
+                }) { Text("Move to trash", color = MaterialTheme.colorScheme.error) }
             },
             dismissButton = { TextButton({ showDeleteDialog = false }) { Text("Keep") } }
         )

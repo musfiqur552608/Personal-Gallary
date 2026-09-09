@@ -26,8 +26,7 @@ data class CaptionEntity(
 )
 
 @Entity(tableName = "custom_albums")
-data class CustomAlbumEntity(
-    @PrimaryKey(autoGenerate = true) val albumId: Long = 0,
+data class CustomAlbumEntity(    @PrimaryKey(autoGenerate = true) val albumId: Long = 0,
     val name: String,
     val createdAt: Long = System.currentTimeMillis(),
     val isPinned: Boolean = false,
@@ -114,4 +113,73 @@ interface AlbumDao {
 
     @Query("UPDATE custom_albums SET isLocked = :locked WHERE albumId = :id")
     suspend fun setLocked(id: Long, locked: Boolean)
+}
+
+// --- Secure recycle bin: file stays on disk, hidden from lists until purged ---
+
+@Entity(tableName = "trash")
+data class TrashEntity(
+    @PrimaryKey val mediaStoreId: Long,
+    val uriString: String,
+    val dateTaken: Long,
+    val trashedAt: Long = System.currentTimeMillis()
+)
+
+@Dao
+interface TrashDao {
+    @Query("SELECT * FROM trash ORDER BY trashedAt DESC")
+    fun observeAll(): Flow<List<TrashEntity>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun add(entry: TrashEntity)
+
+    @Query("DELETE FROM trash WHERE mediaStoreId = :id")
+    suspend fun remove(id: Long)
+
+    @Query("DELETE FROM trash")
+    suspend fun clear()
+
+    @Query("SELECT * FROM trash WHERE trashedAt < :olderThan")
+    suspend fun expired(olderThan: Long): List<TrashEntity>
+}
+
+// --- Vault: per-item lock (hidden everywhere until vault is unlocked) ---
+
+@Entity(tableName = "locked_media")
+data class LockedEntity(
+    @PrimaryKey val mediaStoreId: Long,
+    val uriString: String,
+    val lockedAt: Long = System.currentTimeMillis()
+)
+
+@Dao
+interface LockedDao {
+    @Query("SELECT * FROM locked_media ORDER BY lockedAt DESC")
+    fun observeAll(): Flow<List<LockedEntity>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun add(entry: LockedEntity)
+
+    @Query("DELETE FROM locked_media WHERE mediaStoreId = :id")
+    suspend fun remove(id: Long)
+}
+
+// --- Break-in log: failed unlock attempts (timestamps only, local) ---
+
+@Entity(tableName = "attempts")
+data class AttemptEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val ts: Long = System.currentTimeMillis()
+)
+
+@Dao
+interface AttemptDao {
+    @Query("SELECT * FROM attempts ORDER BY ts DESC")
+    fun observeAll(): Flow<List<AttemptEntity>>
+
+    @Insert
+    suspend fun log(entry: AttemptEntity)
+
+    @Query("DELETE FROM attempts")
+    suspend fun clear()
 }

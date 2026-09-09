@@ -24,6 +24,7 @@ import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
@@ -173,13 +174,21 @@ fun AlbumDetailScreen(
     title: String,
     items: List<MediaItem>,
     onOpen: (MediaItem) -> Unit,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    onPlay: (() -> Unit)? = null
 ) {
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text(title) },
-                navigationIcon = { IconButton(onBack) { Icon(Icons.Default.ArrowBack, "Back") } }
+                navigationIcon = { IconButton(onBack) { Icon(Icons.Default.ArrowBack, "Back") } },
+                actions = {
+                    if (onPlay != null && items.isNotEmpty()) {
+                        IconButton(onClick = onPlay) {
+                            Icon(Icons.Default.PlayArrow, "Play slideshow")
+                        }
+                    }
+                }
             )
         }
     ) { pad ->

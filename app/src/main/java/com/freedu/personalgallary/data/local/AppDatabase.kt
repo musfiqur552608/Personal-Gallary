@@ -6,14 +6,20 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 
 @Database(
-    entities = [FavoriteEntity::class, CaptionEntity::class, CustomAlbumEntity::class, AlbumItemCrossRef::class],
-    version = 1,
+    entities = [
+        FavoriteEntity::class, CaptionEntity::class, CustomAlbumEntity::class,
+        AlbumItemCrossRef::class, TrashEntity::class, LockedEntity::class, AttemptEntity::class
+    ],
+    version = 2,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun favorites(): FavoriteDao
     abstract fun captions(): CaptionDao
     abstract fun albums(): AlbumDao
+    abstract fun trash(): TrashDao
+    abstract fun locked(): LockedDao
+    abstract fun attempts(): AttemptDao
 
     companion object {
         @Volatile private var INSTANCE: AppDatabase? = null
@@ -24,7 +30,7 @@ abstract class AppDatabase : RoomDatabase() {
                     context.applicationContext,
                     AppDatabase::class.java,
                     "personal_gallery.db"
-                ).build().also { INSTANCE = it }
+                ).fallbackToDestructiveMigration().build().also { INSTANCE = it }
             }
     }
 }
