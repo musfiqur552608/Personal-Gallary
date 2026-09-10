@@ -212,8 +212,10 @@ private fun AppRoot(
     var vaultOpen by remember { mutableStateOf(false) }
     var vaultGate by remember { mutableStateOf(false) }
 
-    // gallery UI state
-    var query by remember { mutableStateOf("") }
+    // gallery UI state (each tab keeps its own search text)
+    var galleryQuery by remember { mutableStateOf("") }
+    var feedQuery by remember { mutableStateOf("") }
+    var reelsQuery by remember { mutableStateOf("") }
     var filter by remember { mutableStateOf(GalleryFilter.ALL) }
     var isGrid by remember { mutableStateOf(true) }
     var deviceAlbumFilter by remember { mutableStateOf<String?>(null) }
@@ -516,8 +518,8 @@ private fun AppRoot(
     val customShown = remember(customAlbums, decoyMode) {
         if (decoyMode) emptyList() else customAlbums
     }
-    val feedPosts = remember(posts, query, visible) {
-        if (query.isBlank()) posts else galleryVm.search(query, posts)
+    val feedPosts = remember(posts, feedQuery, visible) {
+        if (feedQuery.isBlank()) posts else galleryVm.search(feedQuery, posts)
     }
     val attemptsText = remember(attemptList) {
         if (attemptList.isEmpty()) "No failed attempts recorded"
@@ -527,7 +529,11 @@ private fun AppRoot(
         }
     }
 
-    val galleryBase: List<MediaItem> = remember(visible, filter, deviceAlbumFilter, query, state.favorites, shuffleSeed) {
+    val reelsVisible = remember(visible, reelsQuery) {
+        if (reelsQuery.isBlank()) reels else galleryVm.search(reelsQuery, reels)
+    }
+
+    val galleryBase: List<MediaItem> = remember(visible, filter, deviceAlbumFilter, galleryQuery, state.favorites, shuffleSeed) {
         var list = when (filter) {
             GalleryFilter.ALL -> visible
             GalleryFilter.PHOTOS -> visible.filter { it.type == MediaType.IMAGE }
@@ -536,7 +542,7 @@ private fun AppRoot(
             GalleryFilter.FAVORITES -> visible.filter { it.id in state.favorites }
         }
         if (deviceAlbumFilter != null) list = list.filter { it.albumName == deviceAlbumFilter }
-        if (query.isNotBlank()) list = galleryVm.search(query, list)
+        if (galleryQuery.isNotBlank()) list = galleryVm.search(galleryQuery, list)
         if (shuffleSeed > 0) list.shuffled(Random(shuffleSeed)) else list
     }
 
@@ -619,12 +625,14 @@ private fun AppRoot(
                         onSurprise = {
                             galleryVm.randomItem(visible)?.let { openDetailInCtx(it, visible) }
                                 ?: toast("Nothing here yet")
-                        }
+                        },
+                        query = feedQuery,
+                        onQuery = { feedQuery = it }
                     )
                 }
                 composable(Routes.REELS) {
                     ReelsScreen(
-                        reels = reels,
+                        reels = reelsVisible,
                         isFavorite = { galleryVm.isFavorite(it) },
                         showInfo = settings.showReelsInfo,
                         onToggleFavorite = { galleryVm.toggleFavorite(it); onUserActive() },
@@ -637,7 +645,9 @@ private fun AppRoot(
                                 val ok = WallpaperHelper.setAsWallpaper(context, it)
                                 toast(if (ok) "Wallpaper set" else "Couldn't set wallpaper")
                             }
-                        }
+                        },
+                        query = reelsQuery,
+                        onQuery = { reelsQuery = it }
                     )
                 }
                 composable(Routes.GALLERY) {
@@ -646,8 +656,8 @@ private fun AppRoot(
                         albums = deviceAlbums,
                         activeFilter = filter,
                         onFilter = { filter = it },
-                        query = query,
-                        onQuery = { query = it },
+                        query = galleryQuery,
+                        onQuery = { galleryQuery = it },
                         isGrid = isGrid,
                         onToggleView = { isGrid = !isGrid },
                         selectedAlbum = deviceAlbumFilter,
@@ -863,7 +873,7 @@ private fun AppRoot(
                         albums = deviceAlbums,
                         onOpen = { openDetail(it) },
                         onReviewScreenshots = {
-                            query = "screenshots"
+                            galleryQuery = "screenshots"
                             filter = GalleryFilter.ALL
                             deviceAlbumFilter = null
                             nav.navigate(Routes.GALLERY) {

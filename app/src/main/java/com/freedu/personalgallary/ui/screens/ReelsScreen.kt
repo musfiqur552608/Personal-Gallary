@@ -23,6 +23,8 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
@@ -30,6 +32,7 @@ import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.VolumeOff
 import androidx.compose.material.icons.filled.VolumeUp
@@ -38,11 +41,14 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -50,12 +56,15 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.media3.common.MediaItem as ExoMediaItem
@@ -86,12 +95,123 @@ fun ReelsScreen(
     onDelete: (MediaItem) -> Unit,
     onAddToAlbum: (MediaItem) -> Unit,
     onDetails: (MediaItem) -> Unit,
-    onWallpaper: ((MediaItem) -> Unit)? = null
+    onWallpaper: ((MediaItem) -> Unit)? = null,
+    query: String = "",
+    onQuery: (String) -> Unit = {}
 ) {
-    if (reels.isEmpty()) {
+    if (reels.isEmpty() && query.isBlank()) {
         EmptyState("No reels yet", "Videos of 60 seconds or less will appear here as a full-screen swipeable feed.")
         return
     }
+    var searchOpen by remember { mutableStateOf(false) }
+    val focusRequester = remember { FocusRequester() }
+    val keyboard = LocalSoftwareKeyboardController.current
+    LaunchedEffect(searchOpen) {
+        if (searchOpen) focusRequester.requestFocus() else keyboard?.hide()
+    }
+    Box(Modifier.fillMaxSize()) {
+        if (reels.isNotEmpty()) {
+            // reset pager whenever the search changes so the page index stays valid
+            key(query) {
+                ReelsPager(
+                    reels = reels,
+                    isFavorite = isFavorite,
+                    showInfo = showInfo,
+                    onToggleFavorite = onToggleFavorite,
+                    onShare = onShare,
+                    onDelete = onDelete,
+                    onAddToAlbum = onAddToAlbum,
+                    onDetails = onDetails,
+                    onWallpaper = onWallpaper
+                )
+            }
+        } else {
+            Box(Modifier.fillMaxSize().background(Color.Black), contentAlignment = Alignment.Center) {
+                Text(
+                    "No reels match \"$query\"",
+                    color = Color.White.copy(alpha = 0.8f),
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            }
+        }
+        // search: compact icon until tapped, then expands into a full bar
+        if (!searchOpen) {
+            IconButton(
+                onClick = { searchOpen = true },
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(top = 52.dp, start = 12.dp)
+                    .clip(CircleShape)
+                    .background(Color.Black.copy(alpha = 0.45f))
+            ) {
+                Icon(Icons.Default.Search, "Search reels", tint = Color.White)
+            }
+        } else {
+            Row(
+                Modifier
+                    .align(Alignment.TopCenter)
+                    .fillMaxWidth()
+                    .padding(top = 52.dp, start = 12.dp, end = 12.dp)
+                    .clip(RoundedCornerShape(24.dp))
+                    .background(Color.Black.copy(alpha = 0.55f))
+                    .padding(horizontal = 4.dp, vertical = 2.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(onClick = {
+                    searchOpen = false
+                    onQuery("")
+                }) {
+                    Icon(Icons.Default.ArrowBack, "Close search", tint = Color.White)
+                }
+                OutlinedTextField(
+                    value = query,
+                    onValueChange = onQuery,
+                    placeholder = {
+                        Text("Search reels…", color = Color.White.copy(alpha = 0.6f))
+                    },
+                    singleLine = true,
+                    textStyle = MaterialTheme.typography.bodyMedium.copy(color = Color.White),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = Color.White,
+                        unfocusedTextColor = Color.White,
+                        cursorColor = Color.White,
+                        focusedBorderColor = Color.Transparent,
+                        unfocusedBorderColor = Color.Transparent,
+                        focusedContainerColor = Color.Transparent,
+                        unfocusedContainerColor = Color.Transparent,
+                        focusedPlaceholderColor = Color.White.copy(alpha = 0.6f),
+                        unfocusedPlaceholderColor = Color.White.copy(alpha = 0.6f)
+                    ),
+                    modifier = Modifier
+                        .weight(1f)
+                        .focusRequester(focusRequester)
+                )
+                if (query.isNotEmpty()) {
+                    IconButton(onClick = { onQuery("") }, modifier = Modifier.size(32.dp)) {
+                        Icon(
+                            Icons.Default.Clear, "Clear search",
+                            tint = Color.White.copy(alpha = 0.85f),
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ReelsPager(
+    reels: List<MediaItem>,
+    isFavorite: (Long) -> Boolean,
+    showInfo: Boolean,
+    onToggleFavorite: (MediaItem) -> Unit,
+    onShare: (MediaItem) -> Unit,
+    onDelete: (MediaItem) -> Unit,
+    onAddToAlbum: (MediaItem) -> Unit,
+    onDetails: (MediaItem) -> Unit,
+    onWallpaper: ((MediaItem) -> Unit)? = null
+) {
     val pagerState = rememberPagerState(pageCount = { reels.size })
     VerticalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { page ->
         val item = reels[page]

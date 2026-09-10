@@ -25,9 +25,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Cake
 import androidx.compose.material.icons.filled.Casino
+import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PlayCircle
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
@@ -35,6 +37,7 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -81,7 +84,9 @@ fun FeedScreen(
     onAddToAlbum: (MediaItem) -> Unit,
     onOpenMemories: () -> Unit = {},
     onRefresh: () -> Unit = {},
-    onSurprise: () -> Unit = {}
+    onSurprise: () -> Unit = {},
+    query: String = "",
+    onQuery: (String) -> Unit = {}
 ) {
     if (isLoading) {
         Column(Modifier.fillMaxSize()) {
@@ -116,6 +121,7 @@ fun FeedScreen(
         )
         return
     }
+    val searching = query.isNotBlank()
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(bottom = 96.dp),
@@ -124,14 +130,48 @@ fun FeedScreen(
         item {
             FeedHeader(totalCount = totalCount, onRefresh = onRefresh, onSurprise = onSurprise)
         }
-        if (stories.isNotEmpty()) {
+        item {
+            OutlinedTextField(
+                value = query,
+                onValueChange = onQuery,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp, vertical = 2.dp),
+                placeholder = { Text("Search posts…") },
+                leadingIcon = { Icon(Icons.Default.Search, null) },
+                trailingIcon = {
+                    if (query.isNotEmpty()) IconButton(onClick = { onQuery("") }) {
+                        Icon(Icons.Default.Clear, "Clear search")
+                    }
+                },
+                singleLine = true,
+                shape = RoundedCornerShape(16.dp)
+            )
+        }
+        if (!searching && stories.isNotEmpty()) {
             item {
                 StoriesBar(stories, onOpen)
             }
         }
-        if (memories.isNotEmpty()) {
+        if (!searching && memories.isNotEmpty()) {
             item {
                 MemoriesCard(memories, onOpenMemories, onOpen)
+            }
+        }
+        if (searching && posts.isEmpty()) {
+            item {
+                Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(48.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        "No posts match \"$query\"",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
         }
         items(posts, key = { it.id }) { item ->
