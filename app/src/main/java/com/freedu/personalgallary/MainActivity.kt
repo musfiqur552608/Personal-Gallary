@@ -2,11 +2,15 @@ package com.freedu.personalgallary
 
 import android.Manifest
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.hardware.Sensor
 import android.hardware.SensorManager
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.SystemClock
+import android.view.KeyEvent
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
@@ -15,9 +19,12 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Home
@@ -65,25 +72,37 @@ import androidx.work.WorkManager
 import com.freedu.personalgallary.data.local.CustomAlbumEntity
 import com.freedu.personalgallary.data.model.MediaItem
 import com.freedu.personalgallary.data.model.MediaType
+import com.freedu.personalgallary.data.model.SmartKeys
+import com.freedu.personalgallary.data.model.SortOrder
 import com.freedu.personalgallary.ui.navigation.Routes
 import com.freedu.personalgallary.ui.screens.AddToAlbumSheet
 import com.freedu.personalgallary.ui.screens.AlbumDetailScreen
 import com.freedu.personalgallary.ui.screens.AlbumsScreen
+import com.freedu.personalgallary.ui.screens.BackupDialog
+import com.freedu.personalgallary.ui.screens.CapsuleScreen
 import com.freedu.personalgallary.ui.screens.CollageScreen
+import com.freedu.personalgallary.ui.screens.CompareScreen
+import com.freedu.personalgallary.ui.screens.DateFixScreen
 import com.freedu.personalgallary.ui.screens.DetailScreen
+import com.freedu.personalgallary.ui.screens.DuplicatesScreen
+import com.freedu.personalgallary.ui.screens.FacesScreen
 import com.freedu.personalgallary.ui.screens.FavoritesScreen
 import com.freedu.personalgallary.ui.screens.FeedScreen
 import com.freedu.personalgallary.ui.screens.FilterScreen
 import com.freedu.personalgallary.ui.screens.FolderFilterDialog
 import com.freedu.personalgallary.ui.screens.GalleryFilter
 import com.freedu.personalgallary.ui.screens.GalleryScreen
+import com.freedu.personalgallary.ui.screens.JournalScreen
+import com.freedu.personalgallary.ui.screens.KioskScreen
 import com.freedu.personalgallary.ui.screens.LockScreen
 import com.freedu.personalgallary.ui.screens.MarkupScreen
 import com.freedu.personalgallary.ui.screens.MediaDetailsDialog
+import com.freedu.personalgallary.ui.screens.OcrScreen
 import com.freedu.personalgallary.ui.screens.OnboardingScreen
 import com.freedu.personalgallary.ui.screens.PlacesScreen
 import com.freedu.personalgallary.ui.screens.ProfileScreen
 import com.freedu.personalgallary.ui.screens.ReelsScreen
+import com.freedu.personalgallary.ui.screens.RulesScreen
 import com.freedu.personalgallary.ui.screens.SlideshowScreen
 import com.freedu.personalgallary.ui.screens.StatsScreen
 import com.freedu.personalgallary.ui.screens.StorageScreen
@@ -92,10 +111,12 @@ import com.freedu.personalgallary.ui.screens.ToolsScreen
 import com.freedu.personalgallary.ui.screens.TrashScreen
 import com.freedu.personalgallary.ui.screens.TrimScreen
 import com.freedu.personalgallary.ui.screens.VaultScreen
+import com.freedu.personalgallary.ui.screens.VoiceNoteSheet
 import com.freedu.personalgallary.ui.screens.YearInReviewScreen
 import com.freedu.personalgallary.ui.theme.PersonalGallaryTheme
 import com.freedu.personalgallary.ui.viewmodel.GalleryViewModel
 import com.freedu.personalgallary.ui.viewmodel.SettingsViewModel
+import com.freedu.personalgallary.util.CryptoBackup
 import com.freedu.personalgallary.util.FormatUtils
 import com.freedu.personalgallary.util.PdfExport
 import com.freedu.personalgallary.util.ShakeDetector
@@ -118,6 +139,21 @@ import kotlin.random.Random
 class MainActivity : FragmentActivity() {
 
     private var lastActiveMs = System.currentTimeMillis()
+    internal var panicHandler: (() -> Unit)? = null
+    private var volPresses = mutableListOf<Long>()
+
+    override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
+        if (keyCode == KeyEvent.KEYCODE_VOLUME_DOWN) {
+            val now = SystemClock.uptimeMillis()
+            volPresses.add(now)
+            volPresses = volPresses.filter { now - it < 1500 }.toMutableList()
+            if (volPresses.size >= 3) {
+                volPresses.clear()
+                panicHandler?.invoke()
+            }
+        }
+        return super.onKeyDown(keyCode, event)
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -173,7 +209,7 @@ private val TABS = listOf(
 
 private val IMMERSIVE_ROUTES = setOf(
     Routes.REELS, Routes.SLIDESHOW, Routes.COLLAGE,
-    Routes.FILTER, Routes.MARKUP, Routes.TRIM
+    Routes.FILTER, Routes.MARKUP, Routes.TRIM, Routes.KIOSK
 )
 
 private fun requiredPermissions(): Array<String> =
@@ -196,6 +232,8 @@ private fun AppRoot(
     val state by galleryVm.state.collectAsState()
     val settings by settingsVm.state.collectAsState()
     val customAlbums by galleryVm.customAlbums.collectAsState()
+    val customCapsules by galleryVm.capsules.collectAsState()
+    val journalMap by galleryVm.journalNotes.collectAsState()
     val attemptList by galleryVm.attempts.collectAsState()
 
     val nav = rememberNavController()
@@ -226,6 +264,7 @@ private fun AppRoot(
     var captionTarget by remember { mutableStateOf<MediaItem?>(null) }
     var captionText by remember { mutableStateOf("") }
     var albumTarget by remember { mutableStateOf<MediaItem?>(null) }
+    var batchAlbumTargets by remember { mutableStateOf<List<MediaItem>?>(null) }
     var detailsTarget by remember { mutableStateOf<MediaItem?>(null) }
     var pendingDelete by remember { mutableStateOf<MediaItem?>(null) }
     var showFolders by remember { mutableStateOf(false) }
@@ -233,6 +272,16 @@ private fun AppRoot(
     var customAlbumDetail by remember { mutableStateOf<CustomAlbumEntity?>(null) }
     var showMemories by remember { mutableStateOf(false) }
     var pendingReminder by remember { mutableStateOf(false) }
+    var showBackup by remember { mutableStateOf(false) }
+    var backupBusy by remember { mutableStateOf(false) }
+    var backupImportUri by remember { mutableStateOf<Uri?>(null) }
+    var backupImportName by remember { mutableStateOf<String?>(null) }
+    var voiceTarget by remember { mutableStateOf<MediaItem?>(null) }
+    var voiceBusy by remember { mutableStateOf(false) }
+    var pendingVoiceItem by remember { mutableStateOf<MediaItem?>(null) }
+    var capsulePickerTarget by remember { mutableStateOf<MediaItem?>(null) }
+    var showKioskPicker by remember { mutableStateOf(false) }
+    var kioskExit by remember { mutableStateOf(false) }
 
     val needsLock = settings.appLock && settingsVm.locks.hasPin() && !unlocked
 
@@ -302,6 +351,26 @@ private fun AppRoot(
             Toast.makeText(context, "Reminder needs notification permission", Toast.LENGTH_LONG).show()
         }
         pendingReminder = false
+    }
+    val micLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) {
+            pendingVoiceItem?.let { voiceTarget = it }
+            Toast.makeText(context, "Microphone ready — tap record", Toast.LENGTH_SHORT).show()
+        } else {
+            Toast.makeText(context, "Microphone permission needed for voice notes", Toast.LENGTH_LONG).show()
+        }
+        pendingVoiceItem = null
+    }
+    val importPicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            backupImportUri = uri
+            backupImportName = uri.lastPathSegment?.substringAfterLast('/') ?: "backup.pgbak"
+            showBackup = true
+        }
     }
     LaunchedEffect(Unit) {
         val granted = requiredPermissions().any {
@@ -402,6 +471,17 @@ private fun AppRoot(
         )
     }
 
+    // panic gesture: triple volume-down jumps silently to decoy mode
+    DisposableEffect(settings.panicGesture, unlocked, decoyMode) {
+        (context as MainActivity).panicHandler = {
+            if (settings.panicGesture && settingsVm.locks.hasPin()) {
+                unlocked = true
+                decoyMode = true
+            }
+        }
+        onDispose { (context as MainActivity).panicHandler = null }
+    }
+
     // ---- gates ----
     if (!settings.onboarded && !state.hasPermission) {
         OnboardingScreen(onGrant = { launcher.launch(requiredPermissions()) })
@@ -445,7 +525,7 @@ private fun AppRoot(
         )
         return
     }
-    if (setupPinMode || decoySetupMode || pendingVaultAlbum != null || vaultGate) {
+    if (setupPinMode || decoySetupMode || pendingVaultAlbum != null || vaultGate || kioskExit) {
         LockScreen(
             hasPin = settingsVm.locks.hasPin(),
             biometricAvailable = false,
@@ -468,7 +548,7 @@ private fun AppRoot(
                         lockError = null
                     } else lockError = "PINs don't match (min 4 digits)"
                 } else {
-                    // vault unlock
+                    // vault unlock / kiosk exit
                     if (settingsVm.verifyPin(combined)) {
                         pendingVaultAlbum?.let { vaultUnlockedIds = vaultUnlockedIds + it.albumId }
                         pendingVaultAlbum = null
@@ -476,6 +556,10 @@ private fun AppRoot(
                             vaultGate = false
                             vaultOpen = true
                             nav.navigate(Routes.VAULT) { launchSingleTop = true }
+                        }
+                        if (kioskExit) {
+                            kioskExit = false
+                            nav.popBackStack()
                         }
                         lockError = null
                         onUserActive()
@@ -491,6 +575,7 @@ private fun AppRoot(
                 decoySetupMode = false
                 pendingVaultAlbum = null
                 vaultGate = false
+                kioskExit = false
                 lockError = null
             }
         )
@@ -533,7 +618,7 @@ private fun AppRoot(
         if (reelsQuery.isBlank()) reels else galleryVm.search(reelsQuery, reels)
     }
 
-    val galleryBase: List<MediaItem> = remember(visible, filter, deviceAlbumFilter, galleryQuery, state.favorites, shuffleSeed) {
+    val galleryBase: List<MediaItem> = remember(visible, filter, deviceAlbumFilter, galleryQuery, state.favorites, shuffleSeed, settings.sortOrder) {
         var list = when (filter) {
             GalleryFilter.ALL -> visible
             GalleryFilter.PHOTOS -> visible.filter { it.type == MediaType.IMAGE }
@@ -543,7 +628,24 @@ private fun AppRoot(
         }
         if (deviceAlbumFilter != null) list = list.filter { it.albumName == deviceAlbumFilter }
         if (galleryQuery.isNotBlank()) list = galleryVm.search(galleryQuery, list)
-        if (shuffleSeed > 0) list.shuffled(Random(shuffleSeed)) else list
+        val sortEnum = try { SortOrder.valueOf(settings.sortOrder) } catch (_: Exception) { SortOrder.NEWEST }
+        list = when (sortEnum) {
+            SortOrder.NEWEST -> list.sortedByDescending { it.dateTaken }
+            SortOrder.OLDEST -> list.sortedBy { it.dateTaken }
+            SortOrder.LARGEST -> list.sortedByDescending { it.sizeBytes }
+            SortOrder.NAME -> list.sortedBy { it.name.lowercase() }
+        }
+        if (shuffleSeed > 0 && sortEnum == SortOrder.NEWEST) list.shuffled(Random(shuffleSeed)) else list
+    }
+    val sortEnum = try { SortOrder.valueOf(settings.sortOrder) } catch (_: Exception) { SortOrder.NEWEST }
+
+    // auto-rules toast
+    val rulesCount by galleryVm.rulesToast.collectAsState()
+    LaunchedEffect(rulesCount) {
+        if (rulesCount > 0) {
+            Toast.makeText(context, "Auto-rules tidied $rulesCount items", Toast.LENGTH_LONG).show()
+            galleryVm.consumeRulesToast()
+        }
     }
 
     fun openDetail(item: MediaItem) {
@@ -558,10 +660,93 @@ private fun AppRoot(
         nav.navigate(Routes.detail(item.id)) { launchSingleTop = true }
     }
 
+    fun openVoiceSheet(item: MediaItem) {
+        onUserActive()
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) ==
+            PackageManager.PERMISSION_GRANTED
+        ) {
+            voiceTarget = item
+        } else {
+            pendingVoiceItem = item
+            micLauncher.launch(Manifest.permission.RECORD_AUDIO)
+        }
+    }
+
     fun moveToTrashAndBack(item: MediaItem) {
         galleryVm.moveToTrash(item)
         toast("Moved to trash · 30 days to restore")
         if (currentRoute?.startsWith("detail") == true) nav.popBackStack()
+    }
+
+    fun openLiveWallpaper() {
+        onUserActive()
+        try {
+            context.startActivity(
+                Intent(android.app.WallpaperManager.ACTION_LIVE_WALLPAPER_CHOOSER)
+            )
+        } catch (_: Exception) {
+            Toast.makeText(context, "Live wallpapers not supported here", Toast.LENGTH_LONG).show()
+        }
+    }
+
+    fun doEncryptedExport(password: String) {
+        onUserActive()
+        if (password.length < 4) {
+            Toast.makeText(context, "Password too short", Toast.LENGTH_SHORT).show()
+            return
+        }
+        backupBusy = true
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val json = galleryVm.exportJson()
+                val blob = CryptoBackup.encrypt(password, json.toString().toByteArray())
+                val uri = CryptoBackup.writeBackupFile(context, CryptoBackup.defaultName(), blob)
+                withContext(Dispatchers.Main) {
+                    backupBusy = false
+                    if (uri != null) {
+                        showBackup = false
+                        ShareUtils.shareFile(context, uri, "application/octet-stream", "Encrypted backup")
+                    } else toast("Export failed")
+                }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) {
+                    backupBusy = false
+                    toast("Export failed")
+                }
+            }
+        }
+    }
+
+    fun doEncryptedImport(password: String) {
+        onUserActive()
+        val uri = backupImportUri
+        if (uri == null || password.length < 4) {
+            toast("Choose a file and enter its password")
+            return
+        }
+        backupBusy = true
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val blob = context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+                val plain = if (blob != null) CryptoBackup.decrypt(password, blob) else null
+                val count = if (plain != null) {
+                    galleryVm.importJson(JSONObject(String(plain)))
+                } else -1
+                withContext(Dispatchers.Main) {
+                    backupBusy = false
+                    if (count >= 0) {
+                        showBackup = false
+                        toast("Restored $count records")
+                        galleryVm.refresh()
+                    } else toast("Wrong password or damaged file")
+                }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) {
+                    backupBusy = false
+                    toast("Restore failed")
+                }
+            }
+        }
     }
 
     fun playSlideshow(items: List<MediaItem>, title: String) {
@@ -670,6 +855,24 @@ private fun AppRoot(
                         onShuffle = {
                             shuffleSeed++
                             toast("Shuffled — shake anytime")
+                        },
+                        columns = settings.gridColumns,
+                        onColumnsChange = { settingsVm.setGridColumns(it) },
+                        sort = sortEnum,
+                        onSortChange = { settingsVm.setSortOrder(it.name) },
+                        onBatchTrash = { list ->
+                            list.forEach { galleryVm.moveToTrash(it) }
+                            toast("Moved ${list.size} to trash")
+                        },
+                        onBatchFavorite = { list ->
+                            list.forEach { galleryVm.addFavorite(it) }
+                            toast("Liked ${list.size}")
+                        },
+                        onBatchShare = { list -> ShareUtils.share(context, list) },
+                        onBatchAlbum = { list -> batchAlbumTargets = list },
+                        onBatchVault = { list ->
+                            list.forEach { galleryVm.lockItem(it) }
+                            toast("Moved ${list.size} to vault")
                         }
                     )
                 }
@@ -716,6 +919,12 @@ private fun AppRoot(
                     val ctxList = detailCtx?.takeIf { list -> list.any { it.id == id } } ?: fallback
                     val safeCtxIdx = if (ctxList.isEmpty()) 0 else
                         ctxList.indexOfFirst { it.id == id }.let { if (it < 0) 0 else it }
+                    val detailItem = ctxList.getOrNull(safeCtxIdx)
+                    // compare target is always the EDITED id (route resolves the original)
+                    val compareEditedId = detailItem?.let {
+                        galleryVm.editedOf(it.id)
+                            ?: if (galleryVm.origOf(it.id) != null) it.id else null
+                    }
                     DetailScreen(
                         items = ctxList,
                         startIndex = if (ctxList.isEmpty()) 0 else safeCtxIdx.coerceIn(0, ctxList.lastIndex),
@@ -735,6 +944,11 @@ private fun AppRoot(
                             toast("Moved to vault")
                             if (currentRoute?.startsWith("detail") == true) nav.popBackStack()
                         },
+                        onFixDate = { nav.navigate(Routes.datefix(it.id)) },
+                        onVoiceNote = { openVoiceSheet(it) },
+                        onSealCapsule = { capsulePickerTarget = it },
+                        compareTarget = compareEditedId,
+                        onCompare = { nav.navigate(Routes.compare(it)) },
                         onBack = { nav.popBackStack() }
                     )
                 }
@@ -783,7 +997,18 @@ private fun AppRoot(
                         onClearDecoy = { settingsVm.clearDecoy(); toast("Decoy PIN removed") },
                         attemptsText = attemptsText,
                         onClearAttempts = { galleryVm.clearAttempts() },
-                        decoyMode = decoyMode
+                        decoyMode = decoyMode,
+                        onFaces = { nav.navigate(Routes.FACES) { launchSingleTop = true } },
+                        onOcr = { nav.navigate(Routes.OCR) { launchSingleTop = true } },
+                        onCapsules = { nav.navigate(Routes.CAPSULES) { launchSingleTop = true } },
+                        onJournal = { nav.navigate(Routes.JOURNAL) { launchSingleTop = true } },
+                        onDuplicates = { nav.navigate(Routes.DUPLICATES) { launchSingleTop = true } },
+                        onRules = { nav.navigate(Routes.RULES) { launchSingleTop = true } },
+                        onKiosk = { showKioskPicker = true },
+                        onBackup = { showBackup = true; backupImportUri = null; backupImportName = null },
+                        onWallpaper = { openLiveWallpaper() },
+                        panic = settings.panicGesture,
+                        onPanic = { settingsVm.setPanicGesture(it) }
                     )
                 }
                 composable(Routes.SLIDESHOW) {
@@ -812,8 +1037,11 @@ private fun AppRoot(
                     } else {
                         FilterScreen(
                             item = m,
-                            onDone = { ok ->
-                                toast(if (ok) "Edited copy saved" else "Couldn't save")
+                            onDone = { ok, savedName ->
+                                if (ok && savedName != null) {
+                                    galleryVm.linkEditByName(m.id, savedName) {}
+                                    toast("Saved — compare in ⋮ menu")
+                                } else toast("Couldn't save")
                                 if (ok) galleryVm.refresh()
                                 nav.popBackStack()
                             },
@@ -829,8 +1057,11 @@ private fun AppRoot(
                     } else {
                         MarkupScreen(
                             item = m,
-                            onDone = { ok ->
-                                toast(if (ok) "Annotated copy saved" else "Couldn't save")
+                            onDone = { ok, savedName ->
+                                if (ok && savedName != null) {
+                                    galleryVm.linkEditByName(m.id, savedName) {}
+                                    toast("Saved — compare in ⋮ menu")
+                                } else toast("Couldn't save")
                                 if (ok) galleryVm.refresh()
                                 nav.popBackStack()
                             },
@@ -935,6 +1166,122 @@ private fun AppRoot(
                         }
                     )
                 }
+                composable(Routes.SMART) { entry ->
+                    val key = entry.arguments?.getString("key").orEmpty()
+                    val title = when (key) {
+                        SmartKeys.RECENT -> "New this week"
+                        SmartKeys.MONTH -> "This month"
+                        SmartKeys.SCREENSHOTS -> "Screenshots"
+                        SmartKeys.LONG_VIDEOS -> "Long videos"
+                        SmartKeys.REELS -> "All reels"
+                        else -> "Smart album"
+                    }
+                    val smartList = remember(visible, key) { galleryVm.smartItems(key, visible) }
+                    AlbumDetailScreen(
+                        title, smartList,
+                        { openDetailInCtx(it, smartList) },
+                        { nav.popBackStack() },
+                        onPlay = { playSlideshow(smartList, title) }
+                    )
+                }
+                composable(Routes.CAPSULES) {
+                    CapsuleScreen(
+                        capsules = customCapsules,
+                        itemsFor = { id -> galleryVm.capsuleItems(id) },
+                        isOpen = { galleryVm.isCapsuleOpen(it) },
+                        onCreate = { name, openAt ->
+                            galleryVm.createCapsule(name, openAt) {
+                                toast("Capsule sealed")
+                            }
+                        },
+                        onDelete = {
+                            galleryVm.deleteCapsule(it)
+                            toast("Capsule deleted (photos stay)")
+                        },
+                        onOpenItem = { item, list -> openDetailInCtx(item, list) }
+                    )
+                }
+                composable(Routes.JOURNAL) {
+                    JournalScreen(
+                        items = visible,
+                        noteFor = { key -> journalMap[key] },
+                        onSave = { key, text ->
+                            galleryVm.saveJournal(key, text)
+                            toast("Note saved")
+                        },
+                        onOpen = { item, list -> openDetailInCtx(item, list) }
+                    )
+                }
+                composable(Routes.FACES) {
+                    FacesScreen(
+                        items = visible,
+                        stats = state.faceStats,
+                        scan = { cb -> galleryVm.scanFaces(visible, cb) },
+                        onOpen = { openDetail(it) }
+                    )
+                }
+                composable(Routes.OCR) {
+                    OcrScreen(
+                        indexedCount = state.ocrTexts.size,
+                        scan = { cb -> galleryVm.scanOcr(visible, cb) }
+                    )
+                }
+                composable(Routes.DUPLICATES) {
+                    DuplicatesScreen(
+                        scan = { cb -> galleryVm.scanDuplicates(visible, cb) },
+                        onTrashItems = { list ->
+                            list.forEach { galleryVm.moveToTrash(it) }
+                            toast("Moved ${list.size} to trash")
+                        },
+                        onOpen = { openDetail(it) }
+                    )
+                }
+                composable(Routes.RULES) {
+                    RulesScreen(
+                        rules = state.rules,
+                        onSet = { type, enabled, days -> galleryVm.setRule(type, enabled, days) }
+                    )
+                }
+                composable(Routes.KIOSK) {
+                    KioskScreen(
+                        items = galleryVm.slideshowItems.ifEmpty { stories },
+                        title = galleryVm.slideshowTitle,
+                        onExitRequest = {
+                            if (settingsVm.locks.hasPin()) kioskExit = true
+                            else nav.popBackStack()
+                        }
+                    )
+                }
+                composable(Routes.DATEFIX) { entry ->
+                    val id = entry.arguments?.getString("mediaId")?.toLongOrNull()
+                    val m = allById[id]
+                    if (m == null) {
+                        LaunchedEffect(Unit) { nav.popBackStack() }
+                    } else {
+                        DateFixScreen(
+                            item = m,
+                            currentDate = galleryVm.dateOf(m),
+                            onSave = { ts ->
+                                if (ts == null) galleryVm.clearDateOverride(m.id)
+                                else galleryVm.setDateOverride(m.id, ts)
+                                toast("Date updated")
+                                nav.popBackStack()
+                            },
+                            onBack = { nav.popBackStack() }
+                        )
+                    }
+                }
+                composable(Routes.COMPARE) { entry ->
+                    val editedId = entry.arguments?.getString("editedId")?.toLongOrNull()
+                    val origId = editedId?.let { galleryVm.origOf(it) }
+                    val after = allById[editedId]
+                    val before = origId?.let { allById[it] }
+                    if (after == null || before == null) {
+                        LaunchedEffect(Unit) { nav.popBackStack() }
+                    } else {
+                        CompareScreen(before = before, after = after) { nav.popBackStack() }
+                    }
+                }
             }
         }
     }
@@ -960,12 +1307,115 @@ private fun AppRoot(
             dismissButton = { TextButton({ captionTarget = null }) { Text("Cancel") } }
         )
     }
-    albumTarget?.let {
+    if (batchAlbumTargets != null || albumTarget != null) {
         AddToAlbumSheet(
             customAlbums = customShown,
             onCreate = { name -> galleryVm.createAlbum(name) },
-            onAdd = { albumId -> albumTarget?.let { m -> galleryVm.addToAlbum(albumId, m) } },
-            onDismiss = { albumTarget = null }
+            onAdd = { albumId ->
+                val targets = batchAlbumTargets ?: albumTarget?.let { listOf(it) } ?: emptyList()
+                targets.forEach { galleryVm.addToAlbum(albumId, it) }
+                toast("Added ${targets.size} to album")
+            },
+            onDismiss = { albumTarget = null; batchAlbumTargets = null }
+        )
+    }
+    if (showBackup) {
+        BackupDialog(
+            importName = backupImportName,
+            busy = backupBusy,
+            onPickFile = { importPicker.launch("application/octet-stream") },
+            onExport = ::doEncryptedExport,
+            onImport = ::doEncryptedImport,
+            onDismiss = { if (!backupBusy) showBackup = false }
+        )
+    }
+    voiceTarget?.let { target ->
+        val note = state.voiceNotes[target.id]
+        VoiceNoteSheet(
+            item = target,
+            existing = note,
+            recording = galleryVm.recordingId == target.id,
+            playing = galleryVm.playingId == target.id,
+            busy = voiceBusy,
+            onRecord = {
+                voiceBusy = true
+                val ok = galleryVm.startVoiceRecord(target)
+                voiceBusy = false
+                if (!ok) toast("Couldn't start recording")
+            },
+            onStopRecord = {
+                if (!galleryVm.stopVoiceRecord(target)) toast("Couldn't save note")
+            },
+            onPlay = { note?.let { galleryVm.toggleVoicePlayback(it) } },
+            onDelete = { galleryVm.deleteVoice(target.id) },
+            onDismiss = { galleryVm.stopPlayback(); voiceTarget = null }
+        )
+    }
+    capsulePickerTarget?.let { target ->
+        AlertDialog(
+            onDismissRequest = { capsulePickerTarget = null },
+            title = { Text("Seal in time capsule") },
+            text = {
+                Column {
+                    if (customCapsules.isEmpty()) {
+                        Text(
+                            "No capsules yet — create one first.",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                    customCapsules.forEach { cap ->
+                        val open = galleryVm.isCapsuleOpen(cap.openAt)
+                        TextButton(onClick = {
+                            galleryVm.addToCapsule(cap.capsuleId, target)
+                            toast(if (open) "Added to ${cap.name}" else "Sealed until ${FormatUtils.formatShortDate(cap.openAt)}")
+                            capsulePickerTarget = null
+                        }) {
+                            Text("${cap.name} · ${if (open) "open" else FormatUtils.formatShortDate(cap.openAt)}")
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton({
+                    capsulePickerTarget = null
+                    nav.navigate(Routes.CAPSULES) { launchSingleTop = true }
+                }) { Text("Manage capsules") }
+            },
+            dismissButton = { TextButton({ capsulePickerTarget = null }) { Text("Cancel") } }
+        )
+    }
+    if (showKioskPicker) {
+        AlertDialog(
+            onDismissRequest = { showKioskPicker = false },
+            title = { Text("Guest kiosk") },
+            text = {
+                androidx.compose.foundation.lazy.LazyColumn {
+                    item {
+                        TextButton(onClick = {
+                            showKioskPicker = false
+                            playSlideshow(memories.ifEmpty { stories }, "Memories")
+                            nav.navigate(Routes.KIOSK) { launchSingleTop = true }
+                        }) { Text("Memories (${memories.size})") }
+                    }
+                    item {
+                        TextButton(onClick = {
+                            showKioskPicker = false
+                            playSlideshow(favItems, "Favorites")
+                            nav.navigate(Routes.KIOSK) { launchSingleTop = true }
+                        }) { Text("Favorites (${favItems.size})") }
+                    }
+                    items(deviceAlbums, key = { it.name }) { album ->
+                        val list = visible.filter { it.albumName == album.name }
+                        TextButton(onClick = {
+                            showKioskPicker = false
+                            playSlideshow(list, album.name)
+                            nav.navigate(Routes.KIOSK) { launchSingleTop = true }
+                        }) { Text("${album.name} (${album.count})") }
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = { TextButton({ showKioskPicker = false }) { Text("Cancel") } }
         )
     }
     detailsTarget?.let {
@@ -1000,6 +1450,15 @@ private fun AppRoot(
         )
     }
     if (showAlbums) {
+        val smartCounts = remember(visible) {
+            mapOf(
+                SmartKeys.RECENT to galleryVm.smartItems(SmartKeys.RECENT, visible).size,
+                SmartKeys.MONTH to galleryVm.smartItems(SmartKeys.MONTH, visible).size,
+                SmartKeys.SCREENSHOTS to galleryVm.smartItems(SmartKeys.SCREENSHOTS, visible).size,
+                SmartKeys.LONG_VIDEOS to galleryVm.smartItems(SmartKeys.LONG_VIDEOS, visible).size,
+                SmartKeys.REELS to galleryVm.smartItems(SmartKeys.REELS, visible).size
+            )
+        }
         AlbumsScreen(
             deviceAlbums = deviceAlbums,
             customAlbums = customShown,
@@ -1018,7 +1477,12 @@ private fun AppRoot(
             onDeleteAlbum = { galleryVm.deleteAlbum(it.albumId) },
             onPinAlbum = { galleryVm.setAlbumPinned(it.albumId, !it.isPinned) },
             onLockAlbum = { galleryVm.setAlbumLocked(it.albumId, !it.isLocked) },
-            onBack = { showAlbums = false }
+            onBack = { showAlbums = false },
+            smartCounts = smartCounts,
+            onOpenSmart = { key ->
+                showAlbums = false
+                nav.navigate(Routes.smart(key))
+            }
         )
     }
     customAlbumDetail?.let { album ->

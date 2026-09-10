@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
@@ -28,6 +29,10 @@ class SettingsRepository(private val context: Context) {
         val SHOW_INFO_ON_REELS = booleanPreferencesKey("reels_info")
         val REMINDER = booleanPreferencesKey("daily_reminder")
         val DYNAMIC_ACCENT = booleanPreferencesKey("dynamic_accent")
+        val PANIC = booleanPreferencesKey("panic_gesture")
+        val GRID_COLUMNS = intPreferencesKey("grid_columns")
+        val SORT_ORDER = stringPreferencesKey("sort_order")
+        val LAST_RULES_RUN = longPreferencesKey("last_rules_run")
     }
 
     data class AllSettings(
@@ -41,7 +46,10 @@ class SettingsRepository(private val context: Context) {
         val onboarded: Boolean = false,
         val showReelsInfo: Boolean = true,
         val dailyReminder: Boolean = false,
-        val dynamicAccent: Boolean = false
+        val dynamicAccent: Boolean = false,
+        val panicGesture: Boolean = true,
+        val gridColumns: Int = 3,
+        val sortOrder: String = "NEWEST"
     )
 
     /** Single snapshot flow — avoids fragile many-flow combine overloads. */
@@ -61,7 +69,10 @@ class SettingsRepository(private val context: Context) {
             onboarded = p[Keys.ONBOARDED] == true,
             showReelsInfo = p[Keys.SHOW_INFO_ON_REELS] != false,
             dailyReminder = p[Keys.REMINDER] == true,
-            dynamicAccent = p[Keys.DYNAMIC_ACCENT] == true
+            dynamicAccent = p[Keys.DYNAMIC_ACCENT] == true,
+            panicGesture = p[Keys.PANIC] != false,
+            gridColumns = (p[Keys.GRID_COLUMNS] ?: 3).coerceIn(2, 5),
+            sortOrder = p[Keys.SORT_ORDER] ?: "NEWEST"
         )
     }
 
@@ -76,6 +87,10 @@ class SettingsRepository(private val context: Context) {
     val showReelsInfo: Flow<Boolean> = all.map { it.showReelsInfo }
     val dailyReminder: Flow<Boolean> = all.map { it.dailyReminder }
     val dynamicAccent: Flow<Boolean> = all.map { it.dynamicAccent }
+    val panicGesture: Flow<Boolean> = all.map { it.panicGesture }
+    val gridColumns: Flow<Int> = all.map { it.gridColumns }
+    val sortOrder: Flow<String> = all.map { it.sortOrder }
+    val lastRulesRun: Flow<Long> = context.settingsStore.data.map { it[Keys.LAST_RULES_RUN] ?: 0L }
 
     suspend fun setTheme(mode: ThemeMode) {
         context.settingsStore.edit { it[Keys.THEME] = mode.name }
@@ -109,5 +124,17 @@ class SettingsRepository(private val context: Context) {
     }
     suspend fun setDynamicAccent(enabled: Boolean) {
         context.settingsStore.edit { it[Keys.DYNAMIC_ACCENT] = enabled }
+    }
+    suspend fun setPanicGesture(enabled: Boolean) {
+        context.settingsStore.edit { it[Keys.PANIC] = enabled }
+    }
+    suspend fun setGridColumns(cols: Int) {
+        context.settingsStore.edit { it[Keys.GRID_COLUMNS] = cols.coerceIn(2, 5) }
+    }
+    suspend fun setSortOrder(order: String) {
+        context.settingsStore.edit { it[Keys.SORT_ORDER] = order }
+    }
+    suspend fun setLastRulesRun(ts: Long) {
+        context.settingsStore.edit { it[Keys.LAST_RULES_RUN] = ts }
     }
 }

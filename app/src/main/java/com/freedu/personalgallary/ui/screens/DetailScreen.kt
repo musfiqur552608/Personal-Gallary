@@ -83,6 +83,11 @@ fun DetailScreen(
     onMarkup: (MediaItem) -> Unit = {},
     onTrimVideo: (MediaItem) -> Unit = {},
     onLockItem: (MediaItem) -> Unit = {},
+    onFixDate: (MediaItem) -> Unit = {},
+    onVoiceNote: (MediaItem) -> Unit = {},
+    onSealCapsule: (MediaItem) -> Unit = {},
+    compareTarget: Long? = null,
+    onCompare: (Long) -> Unit = {},
     onBack: () -> Unit
 ) {
     if (items.isEmpty()) {
@@ -135,6 +140,24 @@ fun DetailScreen(
                             text = { Text("Move to vault") },
                             onClick = { overflow = false; onLockItem(current) }
                         )
+                        DropdownMenuItem(
+                            text = { Text("Fix date") },
+                            onClick = { overflow = false; onFixDate(current) }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Voice note") },
+                            onClick = { overflow = false; onVoiceNote(current) }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Seal in time capsule") },
+                            onClick = { overflow = false; onSealCapsule(current) }
+                        )
+                        if (compareTarget != null) {
+                            DropdownMenuItem(
+                                text = { Text("Compare before / after") },
+                                onClick = { overflow = false; onCompare(compareTarget) }
+                            )
+                        }
                     }
                 }
             )

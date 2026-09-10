@@ -25,7 +25,10 @@ data class SettingsUiState(
     val hasPin: Boolean = false,
     val hasDecoy: Boolean = false,
     val dailyReminder: Boolean = false,
-    val dynamicAccent: Boolean = false
+    val dynamicAccent: Boolean = false,
+    val panicGesture: Boolean = true,
+    val gridColumns: Int = 3,
+    val sortOrder: String = "NEWEST"
 )
 
 class SettingsViewModel(app: Application) : AndroidViewModel(app) {
@@ -49,7 +52,10 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
             hasPin = locks.hasPin(),
             hasDecoy = locks.hasDecoy(),
             dailyReminder = all.dailyReminder,
-            dynamicAccent = all.dynamicAccent
+            dynamicAccent = all.dynamicAccent,
+            panicGesture = all.panicGesture,
+            gridColumns = all.gridColumns,
+            sortOrder = all.sortOrder
         )
     }.stateIn(viewModelScope, SharingStarted.Eagerly, SettingsUiState())
 
@@ -64,6 +70,9 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
     fun setShowReelsInfo(b: Boolean) = viewModelScope.launch { repo.setShowReelsInfo(b) }
     fun setDailyReminder(b: Boolean) = viewModelScope.launch { repo.setDailyReminder(b) }
     fun setDynamicAccent(b: Boolean) = viewModelScope.launch { repo.setDynamicAccent(b) }
+    fun setPanicGesture(b: Boolean) = viewModelScope.launch { repo.setPanicGesture(b) }
+    fun setGridColumns(c: Int) = viewModelScope.launch { repo.setGridColumns(c) }
+    fun setSortOrder(o: String) = viewModelScope.launch { repo.setSortOrder(o) }
 
     fun savePin(pin: String) {
         locks.setPin(pin)

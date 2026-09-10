@@ -7,8 +7,10 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -65,23 +67,31 @@ import com.freedu.personalgallary.ui.theme.brandHorizontal
 import com.freedu.personalgallary.ui.theme.storyRing
 import com.freedu.personalgallary.util.FormatUtils
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun MediaThumb(
     item: MediaItem,
     modifier: Modifier = Modifier,
     contentScale: ContentScale = ContentScale.Crop,
     showBadge: Boolean = true,
-    onClick: (() -> Unit)? = null
+    onClick: (() -> Unit)? = null,
+    onLongClick: (() -> Unit)? = null
 ) {
     val req = ImageRequest.Builder(LocalContext.current)
         .data(item.uri)
         .crossfade(true)
         .build()
+    val gesture = when {
+        onClick != null && onLongClick != null ->
+            Modifier.combinedClickable(onClick = onClick, onLongClick = onLongClick)
+        onClick != null -> Modifier.clickable { onClick() }
+        else -> Modifier
+    }
     Box(
         modifier = modifier
             .clip(RoundedCornerShape(4.dp))
             .background(MaterialTheme.colorScheme.surfaceVariant)
-            .then(if (onClick != null) Modifier.clickable { onClick() } else Modifier)
+            .then(gesture)
     ) {
         AsyncImage(
             model = req,

@@ -87,7 +87,7 @@ private val MARK_COLORS = listOf(
 @Composable
 fun MarkupScreen(
     item: MediaItem,
-    onDone: (Boolean) -> Unit,
+    onDone: (Boolean, String?) -> Unit,
     onBack: () -> Unit
 ) {
     val context = LocalContext.current
@@ -131,7 +131,8 @@ fun MarkupScreen(
                         val bmp = base ?: return@TextButton
                         busy = true
                         scope.launch(Dispatchers.IO) {
-                            val ok = try {
+                            var savedName: String? = null
+                            try {
                                 val out = bmp.copy(android.graphics.Bitmap.Config.ARGB_8888, true)
                                 val canvas = android.graphics.Canvas(out)
                                 strokes.forEach { s ->
@@ -170,17 +171,18 @@ fun MarkupScreen(
                                         paint
                                     )
                                 }
+                                val name = "PG_MARKUP_${System.currentTimeMillis()}.jpg"
                                 val uri = ImageEditUtils.saveBitmapToGallery(
-                                    context, out, "PG_MARKUP_${System.currentTimeMillis()}.jpg"
+                                    context, out, name
                                 )
                                 out.recycle()
-                                uri != null
+                                if (uri != null) savedName = name
                             } catch (_: Exception) {
-                                false
                             }
+                            val done = savedName
                             withContext(Dispatchers.Main) {
                                 busy = false
-                                onDone(ok)
+                                onDone(done != null, done)
                             }
                         }
                     },

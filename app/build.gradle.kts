@@ -75,6 +75,8 @@ dependencies {
     implementation(libs.zoomable)
     implementation(libs.androidx.exifinterface)
     implementation(libs.androidx.palette)
+    implementation(libs.mlkit.face)
+    implementation(libs.mlkit.text)
 
     testImplementation(libs.junit)
     androidTestImplementation(platform(libs.androidx.compose.bom))

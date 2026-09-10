@@ -21,11 +21,17 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.FiberNew
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Movie
+import androidx.compose.material.icons.filled.PhoneAndroid
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.PushPin
+import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -50,6 +56,7 @@ import androidx.compose.ui.unit.dp
 import com.freedu.personalgallary.data.local.CustomAlbumEntity
 import com.freedu.personalgallary.data.model.Album
 import com.freedu.personalgallary.data.model.MediaItem
+import com.freedu.personalgallary.data.model.SmartKeys
 import com.freedu.personalgallary.ui.components.EmptyState
 import com.freedu.personalgallary.ui.components.MediaThumb
 
@@ -64,7 +71,9 @@ fun AlbumsScreen(
     onDeleteAlbum: (CustomAlbumEntity) -> Unit,
     onPinAlbum: (CustomAlbumEntity) -> Unit,
     onLockAlbum: (CustomAlbumEntity) -> Unit,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    smartCounts: Map<String, Int> = emptyMap(),
+    onOpenSmart: (String) -> Unit = {}
 ) {
     var showCreate by remember { mutableStateOf(false) }
     var name by remember { mutableStateOf("") }
@@ -83,6 +92,55 @@ fun AlbumsScreen(
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
+            item {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        Icons.Default.AutoAwesome, null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(end = 6.dp)
+                    )
+                    Text("Smart albums", fontWeight = FontWeight.Bold)
+                }
+            }
+            item {
+                androidx.compose.foundation.lazy.LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    contentPadding = PaddingValues(vertical = 2.dp)
+                ) {
+                    val smarts = listOf(
+                        Triple(SmartKeys.RECENT, "New this week", Icons.Default.FiberNew),
+                        Triple(SmartKeys.MONTH, "This month", Icons.Default.CalendarMonth),
+                        Triple(SmartKeys.SCREENSHOTS, "Screenshots", Icons.Default.PhoneAndroid),
+                        Triple(SmartKeys.LONG_VIDEOS, "Long videos", Icons.Default.Videocam),
+                        Triple(SmartKeys.REELS, "All reels", Icons.Default.Movie)
+                    )
+                    items(smarts) { (key, label, icon) ->
+                        Card(
+                            Modifier
+                                .width(128.dp)
+                                .clickable { onOpenSmart(key) }
+                        ) {
+                            Column(
+                                Modifier.padding(12.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Icon(icon, null, tint = MaterialTheme.colorScheme.primary)
+                                Spacer(Modifier.height(6.dp))
+                                Text(
+                                    label,
+                                    style = MaterialTheme.typography.labelLarge,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                                Text(
+                                    "${smartCounts[key] ?: 0}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+                }
+            }
             if (customAlbums.isNotEmpty()) {
                 item { Text("My collections", fontWeight = FontWeight.Bold) }
                 items(customAlbums, key = { it.albumId }) { album ->

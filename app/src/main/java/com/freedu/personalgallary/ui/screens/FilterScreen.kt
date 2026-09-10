@@ -58,7 +58,7 @@ import kotlinx.coroutines.withContext
 @Composable
 fun FilterScreen(
     item: MediaItem,
-    onDone: (Boolean) -> Unit,
+    onDone: (Boolean, String?) -> Unit,
     onBack: () -> Unit
 ) {
     val context = LocalContext.current
@@ -103,11 +103,10 @@ fun FilterScreen(
                         val bmp = preview ?: return@TextButton
                         busy = true
                         scope.launch {
-                            val uri = ImageEditUtils.saveBitmapToGallery(
-                                context, bmp, "PG_EDIT_${System.currentTimeMillis()}.jpg"
-                            )
+                            val savedName = "PG_EDIT_${System.currentTimeMillis()}.jpg"
+                            val uri = ImageEditUtils.saveBitmapToGallery(context, bmp, savedName)
                             busy = false
-                            onDone(uri != null)
+                            onDone(uri != null, if (uri != null) savedName else null)
                         }
                     },
                     enabled = original != null
