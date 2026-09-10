@@ -22,6 +22,25 @@ object ShareUtils {
             type = mime
             putExtra(Intent.EXTRA_STREAM, uri)
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            clipData = android.content.ClipData.newUri(context.contentResolver, "file", uri)
+        }
+        context.startActivity(Intent.createChooser(intent, title))
+    }
+
+    /** Shares arbitrary content URIs (e.g. FileProvider copies) with read grants. */
+    fun shareUris(context: Context, uris: List<android.net.Uri>, mime: String = "*/*", title: String = "Share") {
+        if (uris.isEmpty()) return
+        if (uris.size == 1) {
+            shareFile(context, uris.first(), mime, title)
+            return
+        }
+        val intent = Intent(Intent.ACTION_SEND_MULTIPLE).apply {
+            type = mime
+            putParcelableArrayListExtra(Intent.EXTRA_STREAM, ArrayList(uris))
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            clipData = android.content.ClipData.newUri(context.contentResolver, "files", uris.first()).apply {
+                uris.drop(1).forEach { addItem(android.content.ClipData.Item(it)) }
+            }
         }
         context.startActivity(Intent.createChooser(intent, title))
     }

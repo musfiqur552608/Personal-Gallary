@@ -43,4 +43,31 @@ object FaceScan {
             Result.failure(e)
         }
     }
+
+    /** Bounding boxes in image pixels (for blurring / cropping). */
+    suspend fun boxes(context: Context, uri: Uri): Result<List<android.graphics.Rect>> {
+        return try {
+            val fast = FaceDetection.getClient(
+                FaceDetectorOptions.Builder()
+                    .setPerformanceMode(FaceDetectorOptions.PERFORMANCE_MODE_FAST)
+                    .setLandmarkMode(FaceDetectorOptions.LANDMARK_MODE_NONE)
+                    .setClassificationMode(FaceDetectorOptions.CLASSIFICATION_MODE_NONE)
+                    .build()
+            )
+            val image = InputImage.fromFilePath(context, uri)
+            suspendCancellableCoroutine { cont ->
+                fast.process(image)
+                    .addOnSuccessListener { faces ->
+                        if (!cont.isCompleted) {
+                            cont.resume(Result.success(faces.map { it.boundingBox }))
+                        }
+                    }
+                    .addOnFailureListener { e ->
+                        if (!cont.isCompleted) cont.resume(Result.failure(e))
+                    }
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
 }

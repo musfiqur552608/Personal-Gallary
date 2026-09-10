@@ -103,6 +103,7 @@ import com.freedu.personalgallary.ui.screens.PlacesScreen
 import com.freedu.personalgallary.ui.screens.ProfileScreen
 import com.freedu.personalgallary.ui.screens.ReelsScreen
 import com.freedu.personalgallary.ui.screens.RulesScreen
+import com.freedu.personalgallary.ui.screens.ShareChoiceDialog
 import com.freedu.personalgallary.ui.screens.SlideshowScreen
 import com.freedu.personalgallary.ui.screens.StatsScreen
 import com.freedu.personalgallary.ui.screens.StorageScreen
@@ -282,6 +283,9 @@ private fun AppRoot(
     var capsulePickerTarget by remember { mutableStateOf<MediaItem?>(null) }
     var showKioskPicker by remember { mutableStateOf(false) }
     var kioskExit by remember { mutableStateOf(false) }
+    var shareTargets by remember { mutableStateOf<List<MediaItem>?>(null) }
+    var shareBusy by remember { mutableStateOf(false) }
+    var shareBusyText by remember { mutableStateOf<String?>(null) }
 
     val needsLock = settings.appLock && settingsVm.locks.hasPin() && !unlocked
 
@@ -383,9 +387,61 @@ private fun AppRoot(
         Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
     }
 
+    /** Videos share directly; photos go through the blur-choice dialog. */
+    fun requestShare(items: List<MediaItem>) {
+        onUserActive()
+        if (items.isEmpty()) return
+        if (items.all { it.isVideo }) {
+            ShareUtils.share(context, items)
+        } else {
+            shareTargets = items
+        }
+    }
+
     fun shareItem(item: MediaItem) {
         onUserActive()
-        ShareUtils.share(context, listOf(item))
+        requestShare(listOf(item))
+    }
+
+    fun shareBlurred(targets: List<MediaItem>) {
+        shareBusy = true
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val photos = targets.filter { !it.isVideo }
+                val videos = targets.filter { it.isVideo }
+                val out = ArrayList<android.net.Uri>()
+                var skipped = 0
+                photos.forEachIndexed { i, item ->
+                    withContext(Dispatchers.Main) {
+                        shareBusyText = "Blurring faces… ${i + 1}/${photos.size}"
+                    }
+                    when (val r = com.freedu.personalgallary.util.FaceBlur.prepare(context, item)) {
+                        is com.freedu.personalgallary.util.FaceBlur.Prepared.Blurred -> out.add(r.uri)
+                        is com.freedu.personalgallary.util.FaceBlur.Prepared.NoFaces -> out.add(item.uri)
+                        is com.freedu.personalgallary.util.FaceBlur.Prepared.Failed -> skipped++
+                    }
+                }
+                out.addAll(videos.map { it.uri })
+                withContext(Dispatchers.Main) {
+                    shareBusy = false
+                    shareBusyText = null
+                    shareTargets = null
+                    if (out.isEmpty()) {
+                        toast("Couldn't prepare images (face model unavailable?)")
+                    } else {
+                        if (skipped > 0) toast("$skipped skipped — detection unavailable")
+                        ShareUtils.shareUris(context, out)
+                    }
+                }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) {
+                    shareBusy = false
+                    shareBusyText = null
+                    shareTargets = null
+                    toast("Share failed")
+                }
+            }
+        }
     }
 
     fun doExport() {
@@ -868,7 +924,7 @@ private fun AppRoot(
                             list.forEach { galleryVm.addFavorite(it) }
                             toast("Liked ${list.size}")
                         },
-                        onBatchShare = { list -> ShareUtils.share(context, list) },
+                        onBatchShare = { list -> requestShare(list) },
                         onBatchAlbum = { list -> batchAlbumTargets = list },
                         onBatchVault = { list ->
                             list.forEach { galleryVm.lockItem(it) }
@@ -1420,6 +1476,20 @@ private fun AppRoot(
     }
     detailsTarget?.let {
         MediaDetailsDialog(it, galleryVm.captionFor(it.id)) { detailsTarget = null }
+    }
+    shareTargets?.let { targets ->
+        ShareChoiceDialog(
+            photoCount = targets.count { !it.isVideo },
+            videoCount = targets.count { it.isVideo },
+            busy = shareBusy,
+            busyText = shareBusyText,
+            onShareOriginal = {
+                shareTargets = null
+                ShareUtils.share(context, targets)
+            },
+            onShareBlurred = { shareBlurred(targets) },
+            onDismiss = { if (!shareBusy) shareTargets = null }
+        )
     }
     pendingDelete?.let { target ->
         AlertDialog(
