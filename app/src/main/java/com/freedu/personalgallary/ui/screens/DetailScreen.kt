@@ -88,6 +88,7 @@ fun DetailScreen(
     onSealCapsule: (MediaItem) -> Unit = {},
     compareTarget: Long? = null,
     onCompare: (Long) -> Unit = {},
+    onCompress: (MediaItem) -> Unit = {},
     onBack: () -> Unit
 ) {
     if (items.isEmpty()) {
@@ -129,6 +130,10 @@ fun DetailScreen(
                             DropdownMenuItem(
                                 text = { Text("Markup & annotate") },
                                 onClick = { overflow = false; onMarkup(current) }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Compress photo") },
+                                onClick = { overflow = false; onCompress(current) }
                             )
                         } else {
                             DropdownMenuItem(

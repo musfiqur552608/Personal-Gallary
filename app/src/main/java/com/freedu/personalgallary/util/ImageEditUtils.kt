@@ -127,6 +127,56 @@ object ImageEditUtils {
         bmp: Bitmap,
         displayName: String
     ): Uri? = withContext(Dispatchers.IO) {
+        val stream = java.io.ByteArrayOutputStream()
+        val flat = flattenAlpha(bmp)
+        flat.compress(Bitmap.CompressFormat.JPEG, 92, stream)
+        if (flat !== bmp) {
+            try {
+                flat.recycle()
+            } catch (_: Exception) {
+            }
+        }
+        saveJpegBytes(context, stream.toByteArray(), displayName)
+    }
+
+    /** Renders [uri] bounded by [maxDim] px at JPEG [quality] into memory (for estimates). */
+    suspend fun compressToBytes(
+        context: Context,
+        uri: Uri,
+        maxDim: Int,
+        quality: Int
+    ): ByteArray? = withContext(Dispatchers.IO) {
+        try {
+            val bmp = decodeSampled(context, uri, maxDim) ?: return@withContext null
+            val flat = flattenAlpha(bmp)
+            val stream = java.io.ByteArrayOutputStream()
+            flat.compress(Bitmap.CompressFormat.JPEG, quality.coerceIn(10, 95), stream)
+            try {
+                bmp.recycle()
+                if (flat !== bmp) flat.recycle()
+            } catch (_: Exception) {
+            }
+            stream.toByteArray()
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    /** JPEG (opaque) needs no alpha — paint transparent sources onto white. */
+    private fun flattenAlpha(src: Bitmap): Bitmap {
+        if (!src.hasAlpha()) return src
+        val out = Bitmap.createBitmap(src.width, src.height, Bitmap.Config.ARGB_8888)
+        val c = Canvas(out)
+        c.drawColor(android.graphics.Color.WHITE)
+        c.drawBitmap(src, 0f, 0f, null)
+        return out
+    }
+
+    suspend fun saveJpegBytes(
+        context: Context,
+        bytes: ByteArray,
+        displayName: String
+    ): Uri? = withContext(Dispatchers.IO) {
         try {
             val name = displayName.ifBlank {
                 "PG_${SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())}.jpg"
@@ -146,10 +196,10 @@ object ImageEditUtils {
             val collection = MediaStore.Images.Media.getContentUri(MediaStore.VOLUME_EXTERNAL)
             val uri = resolver.insert(collection, values) ?: return@withContext null
             resolver.openOutputStream(uri)?.use { out ->
-                if (!bmp.compress(Bitmap.CompressFormat.JPEG, 92, out)) {
-                    resolver.delete(uri, null, null)
-                    return@withContext null
-                }
+                out.write(bytes)
+            } ?: run {
+                resolver.delete(uri, null, null)
+                return@withContext null
             }
             if (Build.VERSION.SDK_INT >= 29) {
                 values.clear()

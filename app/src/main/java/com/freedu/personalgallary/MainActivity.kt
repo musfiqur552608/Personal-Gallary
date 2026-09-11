@@ -82,6 +82,7 @@ import com.freedu.personalgallary.ui.screens.BackupDialog
 import com.freedu.personalgallary.ui.screens.CapsuleScreen
 import com.freedu.personalgallary.ui.screens.CollageScreen
 import com.freedu.personalgallary.ui.screens.CompareScreen
+import com.freedu.personalgallary.ui.screens.CompressDialog
 import com.freedu.personalgallary.ui.screens.DateFixScreen
 import com.freedu.personalgallary.ui.screens.DetailScreen
 import com.freedu.personalgallary.ui.screens.DuplicatesScreen
@@ -286,6 +287,7 @@ private fun AppRoot(
     var shareTargets by remember { mutableStateOf<List<MediaItem>?>(null) }
     var shareBusy by remember { mutableStateOf(false) }
     var shareBusyText by remember { mutableStateOf<String?>(null) }
+    var compressTarget by remember { mutableStateOf<MediaItem?>(null) }
 
     val needsLock = settings.appLock && settingsVm.locks.hasPin() && !unlocked
 
@@ -868,7 +870,8 @@ private fun AppRoot(
                                 ?: toast("Nothing here yet")
                         },
                         query = feedQuery,
-                        onQuery = { feedQuery = it }
+                        onQuery = { feedQuery = it },
+                        onCompress = { compressTarget = it }
                     )
                 }
                 composable(Routes.REELS) {
@@ -1005,6 +1008,7 @@ private fun AppRoot(
                         onSealCapsule = { capsulePickerTarget = it },
                         compareTarget = compareEditedId,
                         onCompare = { nav.navigate(Routes.compare(it)) },
+                        onCompress = { compressTarget = it },
                         onBack = { nav.popBackStack() }
                     )
                 }
@@ -1489,6 +1493,19 @@ private fun AppRoot(
             },
             onShareBlurred = { shareBlurred(targets) },
             onDismiss = { if (!shareBusy) shareTargets = null }
+        )
+    }
+    compressTarget?.let { target ->
+        CompressDialog(
+            item = target,
+            onDone = { ok ->
+                compressTarget = null
+                if (ok) {
+                    toast("Compressed copy saved")
+                    galleryVm.refresh()
+                } else toast("Couldn't compress")
+            },
+            onDismiss = { compressTarget = null }
         )
     }
     pendingDelete?.let { target ->
