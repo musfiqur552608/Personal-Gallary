@@ -89,6 +89,7 @@ fun DetailScreen(
     compareTarget: Long? = null,
     onCompare: (Long) -> Unit = {},
     onCompress: (MediaItem) -> Unit = {},
+    onResize: (MediaItem) -> Unit = {},
     onBack: () -> Unit
 ) {
     if (items.isEmpty()) {
@@ -134,6 +135,10 @@ fun DetailScreen(
                             DropdownMenuItem(
                                 text = { Text("Compress photo") },
                                 onClick = { overflow = false; onCompress(current) }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Resize photo") },
+                                onClick = { overflow = false; onResize(current) }
                             )
                         } else {
                             DropdownMenuItem(

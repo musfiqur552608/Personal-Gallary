@@ -103,6 +103,7 @@ import com.freedu.personalgallary.ui.screens.OnboardingScreen
 import com.freedu.personalgallary.ui.screens.PlacesScreen
 import com.freedu.personalgallary.ui.screens.ProfileScreen
 import com.freedu.personalgallary.ui.screens.ReelsScreen
+import com.freedu.personalgallary.ui.screens.ResizeDialog
 import com.freedu.personalgallary.ui.screens.RulesScreen
 import com.freedu.personalgallary.ui.screens.ShareChoiceDialog
 import com.freedu.personalgallary.ui.screens.SlideshowScreen
@@ -288,6 +289,7 @@ private fun AppRoot(
     var shareBusy by remember { mutableStateOf(false) }
     var shareBusyText by remember { mutableStateOf<String?>(null) }
     var compressTarget by remember { mutableStateOf<MediaItem?>(null) }
+    var resizeTarget by remember { mutableStateOf<MediaItem?>(null) }
 
     val needsLock = settings.appLock && settingsVm.locks.hasPin() && !unlocked
 
@@ -871,7 +873,8 @@ private fun AppRoot(
                         },
                         query = feedQuery,
                         onQuery = { feedQuery = it },
-                        onCompress = { compressTarget = it }
+                        onCompress = { compressTarget = it },
+                        onResize = { resizeTarget = it }
                     )
                 }
                 composable(Routes.REELS) {
@@ -1009,6 +1012,7 @@ private fun AppRoot(
                         compareTarget = compareEditedId,
                         onCompare = { nav.navigate(Routes.compare(it)) },
                         onCompress = { compressTarget = it },
+                        onResize = { resizeTarget = it },
                         onBack = { nav.popBackStack() }
                     )
                 }
@@ -1506,6 +1510,19 @@ private fun AppRoot(
                 } else toast("Couldn't compress")
             },
             onDismiss = { compressTarget = null }
+        )
+    }
+    resizeTarget?.let { target ->
+        ResizeDialog(
+            item = target,
+            onDone = { ok ->
+                resizeTarget = null
+                if (ok) {
+                    toast("Resized copy saved")
+                    galleryVm.refresh()
+                } else toast("Couldn't resize")
+            },
+            onDismiss = { resizeTarget = null }
         )
     }
     pendingDelete?.let { target ->

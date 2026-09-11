@@ -41,6 +41,8 @@ import androidx.compose.material.icons.filled.Tv
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material.icons.filled.Wallpaper
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -441,7 +443,7 @@ fun BackupDialog(
             }
         },
         confirmButton = {
-            TextButton(
+            Button(
                 onClick = { onExport(password) },
                 enabled = !busy && password.length >= 4
             ) { Text("Export") }
@@ -450,9 +452,18 @@ fun BackupDialog(
             Row {
                 TextButton(
                     onClick = { onImport(password) },
-                    enabled = !busy && password.length >= 4 && importName != null
+                    enabled = !busy && password.length >= 4 && importName != null,
+                    colors = ButtonDefaults.textButtonColors(
+                        contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 ) { Text("Restore") }
-                TextButton(onClick = onDismiss, enabled = !busy) { Text("Close") }
+                TextButton(
+                    onClick = onDismiss,
+                    enabled = !busy,
+                    colors = ButtonDefaults.textButtonColors(
+                        contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                ) { Text("Close") }
             }
         }
     )

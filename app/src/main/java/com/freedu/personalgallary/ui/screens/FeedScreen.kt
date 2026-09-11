@@ -87,7 +87,8 @@ fun FeedScreen(
     onSurprise: () -> Unit = {},
     query: String = "",
     onQuery: (String) -> Unit = {},
-    onCompress: (MediaItem) -> Unit = {}
+    onCompress: (MediaItem) -> Unit = {},
+    onResize: (MediaItem) -> Unit = {}
 ) {
     if (isLoading) {
         Column(Modifier.fillMaxSize()) {
@@ -187,7 +188,8 @@ fun FeedScreen(
                 onEditCaption = { onEditCaption(item) },
                 onAddToAlbum = { onAddToAlbum(item) },
                 modifier = Modifier.animateItem(),
-                onCompress = { onCompress(item) }
+                onCompress = { onCompress(item) },
+                onResize = { onResize(item) }
             )
         }
     }
@@ -340,7 +342,8 @@ private fun PostCard(
     onEditCaption: () -> Unit,
     onAddToAlbum: () -> Unit,
     modifier: Modifier = Modifier,
-    onCompress: () -> Unit = {}
+    onCompress: () -> Unit = {},
+    onResize: () -> Unit = {}
 ) {
     var menu by remember { mutableStateOf(false) }
     Card(
@@ -388,6 +391,10 @@ private fun PostCard(
                     DropdownMenuItem(
                         text = { Text("Compress photo") },
                         onClick = { menu = false; onCompress() }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Resize photo") },
+                        onClick = { menu = false; onResize() }
                     )
                 }
                 DropdownMenuItem(text = { Text("Delete") }, onClick = { menu = false; onDelete() })

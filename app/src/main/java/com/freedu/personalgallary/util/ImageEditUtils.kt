@@ -172,6 +172,57 @@ object ImageEditUtils {
         return out
     }
 
+    /**
+     * Renders [uri] center-cropped to the exact [outW]×[outH] px (ID/passport sizes).
+     * Returns JPEG bytes (q90) or null.
+     */
+    suspend fun resizeToBytes(
+        context: Context,
+        uri: Uri,
+        outW: Int,
+        outH: Int
+    ): ByteArray? = withContext(Dispatchers.IO) {
+        try {
+            val w = outW.coerceIn(16, 6000)
+            val h = outH.coerceIn(16, 6000)
+            val src = decodeSampled(context, uri, maxOf(w, h) * 2) ?: return@withContext null
+            val targetAspect = w.toFloat() / h
+            val srcAspect = src.width.toFloat() / src.height
+            val (cw, ch) = if (srcAspect > targetAspect) {
+                (src.height * targetAspect).toInt() to src.height
+            } else {
+                src.width to (src.width / targetAspect).toInt()
+            }
+            val cx = ((src.width - cw) / 2).coerceAtLeast(0)
+            val cy = ((src.height - ch) / 2).coerceAtLeast(0)
+            val cropped = Bitmap.createBitmap(src, cx, cy, cw.coerceAtMost(src.width - cx), ch.coerceAtMost(src.height - cy))
+            if (cropped != src) {
+                try {
+                    src.recycle()
+                } catch (_: Exception) {
+                }
+            }
+            val scaled = Bitmap.createScaledBitmap(cropped, w, h, true)
+            if (scaled != cropped) {
+                try {
+                    cropped.recycle()
+                } catch (_: Exception) {
+                }
+            }
+            val flat = flattenAlpha(scaled)
+            val stream = java.io.ByteArrayOutputStream()
+            flat.compress(Bitmap.CompressFormat.JPEG, 90, stream)
+            try {
+                scaled.recycle()
+                if (flat !== scaled) flat.recycle()
+            } catch (_: Exception) {
+            }
+            stream.toByteArray()
+        } catch (_: Exception) {
+            null
+        }
+    }
+
     suspend fun saveJpegBytes(
         context: Context,
         bytes: ByteArray,
