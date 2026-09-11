@@ -396,6 +396,11 @@ private fun PostCard(
                         text = { Text("Resize photo") },
                         onClick = { menu = false; onResize() }
                     )
+                } else {
+                    DropdownMenuItem(
+                        text = { Text("Compress video") },
+                        onClick = { menu = false; onCompress() }
+                    )
                 }
                 DropdownMenuItem(text = { Text("Delete") }, onClick = { menu = false; onDelete() })
             }

@@ -114,6 +114,7 @@ import com.freedu.personalgallary.ui.screens.ToolsScreen
 import com.freedu.personalgallary.ui.screens.TrashScreen
 import com.freedu.personalgallary.ui.screens.TrimScreen
 import com.freedu.personalgallary.ui.screens.VaultScreen
+import com.freedu.personalgallary.ui.screens.VideoCompressDialog
 import com.freedu.personalgallary.ui.screens.VoiceNoteSheet
 import com.freedu.personalgallary.ui.screens.YearInReviewScreen
 import com.freedu.personalgallary.ui.theme.PersonalGallaryTheme
@@ -290,6 +291,7 @@ private fun AppRoot(
     var shareBusyText by remember { mutableStateOf<String?>(null) }
     var compressTarget by remember { mutableStateOf<MediaItem?>(null) }
     var resizeTarget by remember { mutableStateOf<MediaItem?>(null) }
+    var videoCompressTarget by remember { mutableStateOf<MediaItem?>(null) }
 
     val needsLock = settings.appLock && settingsVm.locks.hasPin() && !unlocked
 
@@ -389,6 +391,12 @@ private fun AppRoot(
 
     fun toast(msg: String) {
         Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+    }
+
+    /** Photos -> compress/resize dialogs, videos -> video compress dialog. */
+    fun routeCompress(item: MediaItem) {
+        onUserActive()
+        if (item.isVideo) videoCompressTarget = item else compressTarget = item
     }
 
     /** Videos share directly; photos go through the blur-choice dialog. */
@@ -873,7 +881,7 @@ private fun AppRoot(
                         },
                         query = feedQuery,
                         onQuery = { feedQuery = it },
-                        onCompress = { compressTarget = it },
+                        onCompress = ::routeCompress,
                         onResize = { resizeTarget = it }
                     )
                 }
@@ -894,7 +902,8 @@ private fun AppRoot(
                             }
                         },
                         query = reelsQuery,
-                        onQuery = { reelsQuery = it }
+                        onQuery = { reelsQuery = it },
+                        onCompressVideo = { videoCompressTarget = it }
                     )
                 }
                 composable(Routes.GALLERY) {
@@ -1011,7 +1020,7 @@ private fun AppRoot(
                         onSealCapsule = { capsulePickerTarget = it },
                         compareTarget = compareEditedId,
                         onCompare = { nav.navigate(Routes.compare(it)) },
-                        onCompress = { compressTarget = it },
+                        onCompress = ::routeCompress,
                         onResize = { resizeTarget = it },
                         onBack = { nav.popBackStack() }
                     )
@@ -1523,6 +1532,19 @@ private fun AppRoot(
                 } else toast("Couldn't resize")
             },
             onDismiss = { resizeTarget = null }
+        )
+    }
+    videoCompressTarget?.let { target ->
+        VideoCompressDialog(
+            item = target,
+            onDone = { ok ->
+                videoCompressTarget = null
+                if (ok) {
+                    toast("Compressed video saved")
+                    galleryVm.refresh()
+                } else toast("Couldn't compress video")
+            },
+            onDismiss = { videoCompressTarget = null }
         )
     }
     pendingDelete?.let { target ->

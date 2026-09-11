@@ -97,7 +97,8 @@ fun ReelsScreen(
     onDetails: (MediaItem) -> Unit,
     onWallpaper: ((MediaItem) -> Unit)? = null,
     query: String = "",
-    onQuery: (String) -> Unit = {}
+    onQuery: (String) -> Unit = {},
+    onCompressVideo: (MediaItem) -> Unit = {}
 ) {
     if (reels.isEmpty() && query.isBlank()) {
         EmptyState("No reels yet", "Videos of 60 seconds or less will appear here as a full-screen swipeable feed.")
@@ -122,7 +123,8 @@ fun ReelsScreen(
                     onDelete = onDelete,
                     onAddToAlbum = onAddToAlbum,
                     onDetails = onDetails,
-                    onWallpaper = onWallpaper
+                    onWallpaper = onWallpaper,
+                    onCompressVideo = onCompressVideo
                 )
             }
         } else {
@@ -210,7 +212,8 @@ private fun ReelsPager(
     onDelete: (MediaItem) -> Unit,
     onAddToAlbum: (MediaItem) -> Unit,
     onDetails: (MediaItem) -> Unit,
-    onWallpaper: ((MediaItem) -> Unit)? = null
+    onWallpaper: ((MediaItem) -> Unit)? = null,
+    onCompressVideo: (MediaItem) -> Unit = {}
 ) {
     val pagerState = rememberPagerState(pageCount = { reels.size })
     VerticalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { page ->
@@ -225,6 +228,7 @@ private fun ReelsPager(
             onDelete = { onDelete(item) },
             onAddToAlbum = { onAddToAlbum(item) },
             onDetails = { onDetails(item) },
+            onCompressVideo = { onCompressVideo(item) },
             onWallpaper = onWallpaper?.let { { it(item) } }
         )
     }
@@ -242,6 +246,7 @@ private fun ReelPage(
     onDelete: () -> Unit,
     onAddToAlbum: () -> Unit,
     onDetails: () -> Unit,
+    onCompressVideo: () -> Unit,
     onWallpaper: (() -> Unit)?
 ) {
     val context = LocalContext.current
@@ -356,6 +361,7 @@ private fun ReelPage(
             DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
                 DropdownMenuItem(text = { Text("Add to album") }, onClick = { menu = false; onAddToAlbum() })
                 DropdownMenuItem(text = { Text("Details") }, onClick = { menu = false; onDetails() })
+                DropdownMenuItem(text = { Text("Compress video") }, onClick = { menu = false; onCompressVideo() })
                 if (onWallpaper != null) {
                     DropdownMenuItem(text = { Text("Set as wallpaper") }, onClick = { menu = false; onWallpaper() })
                 }

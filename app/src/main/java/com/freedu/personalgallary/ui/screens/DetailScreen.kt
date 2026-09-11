@@ -145,6 +145,10 @@ fun DetailScreen(
                                 text = { Text("Trim & mute") },
                                 onClick = { overflow = false; onTrimVideo(current) }
                             )
+                            DropdownMenuItem(
+                                text = { Text("Compress video") },
+                                onClick = { overflow = false; onCompress(current) }
+                            )
                         }
                         DropdownMenuItem(
                             text = { Text("Move to vault") },
